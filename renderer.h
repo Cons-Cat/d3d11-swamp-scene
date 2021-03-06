@@ -3,8 +3,11 @@
 #include <d3dcompiler.h>
 
 #include "asset/test_pyramid.h"
+#include "shader/pixl_simple.h"
+#include "shader/vert_simple.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
+
 // Simple Vertex Shader
 const char* vertexShaderSource = R"(
 // an ultra simple hlsl vertex shader
@@ -24,7 +27,7 @@ const char* pixelShaderSource = R"(
 // an ultra simple hlsl pixel shader
 float4 main() : SV_TARGET 
 {	
-	return float4(0.25f,0.0f,1.0f,0); 
+	return float4(0.25f,0.0f,1.0f,0);
 }
 )";
 
@@ -83,12 +86,35 @@ class Renderer {
     CD3D11_BUFFER_DESC cDesc(sizeof(shaderVars), D3D11_BIND_CONSTANT_BUFFER);
     creator->CreateBuffer(&cDesc, &cData, constantBuffer.GetAddressOf());
 
-    // Create Vertex Shader
     UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if _DEBUG
     compilerFlags |= D3DCOMPILE_DEBUG;
 #endif
     Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, errors;
+    /*
+    // Create Vertex Shader
+    if (SUCCEEDED(D3DCompileFromFile(
+            L"../shader/vert_simple.hlsl", nullptr, nullptr, "main", "vs_4_0",
+            compilerFlags, 0, vsBlob.GetAddressOf(), errors.GetAddressOf()))) {
+      creator->CreateVertexShader(vsBlob->GetBufferPointer(),
+                                  vsBlob->GetBufferSize(), nullptr,
+                                  vertexShader.GetAddressOf());
+    } else {
+      std::cout << (char*)errors->GetBufferPointer() << std::endl;
+    }
+    // Create Pixel Shader
+    Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
+    errors.Reset();
+    if (SUCCEEDED(D3DCompileFromFile(
+            L"../shader/pixl_simple.hlsl", nullptr, nullptr, "main", "ps_4_0",
+            compilerFlags, 0, psBlob.GetAddressOf(), errors.GetAddressOf()))) {
+      creator->CreatePixelShader(psBlob->GetBufferPointer(),
+                                 psBlob->GetBufferSize(), nullptr,
+                                 pixelShader.GetAddressOf());
+    } else {
+      std::cout << (char*)errors->GetBufferPointer() << std::endl;
+    }
+    */
     if (SUCCEEDED(D3DCompile(vertexShaderSource, strlen(vertexShaderSource),
                              nullptr, nullptr, nullptr, "main", "vs_4_0",
                              compilerFlags, 0, vsBlob.GetAddressOf(),
