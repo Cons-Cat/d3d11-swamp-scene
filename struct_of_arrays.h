@@ -35,10 +35,13 @@ struct ArraysToGpu {
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> index_buffers;
 
  public:
-  void PushNewModel(const OBJ_VERT*, const unsigned int*);
+  void PushNewModel(const OBJ_VERT*, const unsigned, const unsigned int*,
+                    const unsigned);
 };
 
-void ArraysToGpu::PushNewModel(const OBJ_VERT* vtx, const unsigned int* ind) {
+void ArraysToGpu::PushNewModel(const OBJ_VERT* vtx, const unsigned v_count,
+                               const unsigned int* ind,
+                               const unsigned i_count) {
   size_t i = mats.size();
   // Create Matrix
   mats.push_back(SimpleMats{GW::MATH::GIdentityMatrixF});
@@ -50,12 +53,12 @@ void ArraysToGpu::PushNewModel(const OBJ_VERT* vtx, const unsigned int* ind) {
   // Create Vertex Buffer
   vertx_buffers.push_back(Microsoft::WRL::ComPtr<ID3D11Buffer>());
   D3D11_SUBRESOURCE_DATA vData = {vtx, 0, 0};
-  CD3D11_BUFFER_DESC vDesc(sizeof(*vtx), D3D11_BIND_VERTEX_BUFFER);
+  CD3D11_BUFFER_DESC vDesc(sizeof(*vtx) * v_count, D3D11_BIND_VERTEX_BUFFER);
   creator->CreateBuffer(&vDesc, &vData, vertx_buffers[i].GetAddressOf());
   // Create Index Buffer
   index_buffers.push_back(Microsoft::WRL::ComPtr<ID3D11Buffer>());
   D3D11_SUBRESOURCE_DATA iData = {ind, 0, 0};
-  CD3D11_BUFFER_DESC iDesc(sizeof(*ind), D3D11_BIND_INDEX_BUFFER);
+  CD3D11_BUFFER_DESC iDesc(sizeof(*ind) * i_count, D3D11_BIND_INDEX_BUFFER);
   creator->CreateBuffer(&iDesc, &iData, index_buffers[i].GetAddressOf());
   return;
 };

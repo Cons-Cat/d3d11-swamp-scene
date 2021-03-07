@@ -137,7 +137,8 @@ class Renderer {
     // free temporary handle
     creator->Release();
     // Push render objects.
-    gpu_buffs.PushNewModel(test_pyramid_data, test_pyramid_indicies);
+    gpu_buffs.PushNewModel(test_pyramid_data, test_pyramid_vertexcount,
+                           test_pyramid_indicies, test_pyramid_indexcount);
   }
   void Render() {
     // grab the context & render target
