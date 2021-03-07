@@ -24,6 +24,7 @@ add_executable (GreenScreen
 	# Header & CPP files go here
 	main.cpp
 	renderer.h
+	struct_of_arrays.h
 	asset/test_pyramid.h
 	#../asset/pyramid.h
 	${VERTEX_SHADERS}
