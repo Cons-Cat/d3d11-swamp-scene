@@ -18,29 +18,42 @@ struct SimpleMats {
   GW::MATH::GMATRIXF w, v, p;
 };
 
+/*
+struct SimpleBuffer {
+  SimpleMats m;
+  Microsoft::WRL::ComPtr<ID3D11Buffer> c;
+  Microsoft::WRL::ComPtr<ID3D11Buffer> v;
+  Microsoft::WRL::ComPtr<ID3D11Buffer> i;
+};
+*/
+
 struct ArraysToGpu {
   std::vector<SimpleMats> mats;
+  // TODO: These really should all be one buffer of tuples.
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> const_buffers;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> vertx_buffers;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> index_buffers;
 
  public:
-  void PushNewModel(OBJ_VERT*, unsigned int*);
+  void PushNewModel(const OBJ_VERT*, const unsigned int*);
 };
 
-void ArraysToGpu::PushNewModel(OBJ_VERT* vtx, unsigned int* ind) {
+void ArraysToGpu::PushNewModel(const OBJ_VERT* vtx, const unsigned int* ind) {
   size_t i = mats.size();
   // Create Matrix
   mats.push_back(SimpleMats{GW::MATH::GIdentityMatrixF});
   // Create Constant Buffer
+  const_buffers.push_back(Microsoft::WRL::ComPtr<ID3D11Buffer>());
   D3D11_SUBRESOURCE_DATA cData = {&mats[i], 0, 0};
   CD3D11_BUFFER_DESC cDesc(sizeof(mats[i]), D3D11_BIND_CONSTANT_BUFFER);
   creator->CreateBuffer(&cDesc, &cData, const_buffers[i].GetAddressOf());
   // Create Vertex Buffer
-  D3D11_SUBRESOURCE_DATA bData = {vtx, 0, 0};
-  CD3D11_BUFFER_DESC bDesc(sizeof(*vtx), D3D11_BIND_VERTEX_BUFFER);
-  creator->CreateBuffer(&bDesc, &bData, vertx_buffers[i].GetAddressOf());
+  vertx_buffers.push_back(Microsoft::WRL::ComPtr<ID3D11Buffer>());
+  D3D11_SUBRESOURCE_DATA vData = {vtx, 0, 0};
+  CD3D11_BUFFER_DESC vDesc(sizeof(*vtx), D3D11_BIND_VERTEX_BUFFER);
+  creator->CreateBuffer(&vDesc, &vData, vertx_buffers[i].GetAddressOf());
   // Create Index Buffer
+  index_buffers.push_back(Microsoft::WRL::ComPtr<ID3D11Buffer>());
   D3D11_SUBRESOURCE_DATA iData = {ind, 0, 0};
   CD3D11_BUFFER_DESC iDesc(sizeof(*ind), D3D11_BIND_INDEX_BUFFER);
   creator->CreateBuffer(&iDesc, &iData, index_buffers[i].GetAddressOf());

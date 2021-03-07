@@ -136,6 +136,8 @@ class Renderer {
         vsBlob->GetBufferSize(), vertexFormat.GetAddressOf());
     // free temporary handle
     creator->Release();
+    // Push render objects.
+    gpu_buffs.PushNewModel(test_pyramid_data, test_pyramid_indicies);
   }
   void Render() {
     // grab the context & render target
