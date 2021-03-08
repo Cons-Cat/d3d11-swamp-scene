@@ -156,15 +156,16 @@ class Renderer {
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
     con->IASetInputLayout(vertexFormat.Get());
     // Send buffers to GPU.
-    for (unsigned int i = 0; i < gpu_buffs.vertx_buffers.size(); i++) {
+    for (unsigned int i = 0; i < 1; i++) {
+      // for (unsigned int i = 0; i < gpu_buffs.vertx_buffers.size(); i++) {
       // move pyramid
       // con->UpdateSubresource();
-      ID3D11Buffer* const buffs[] = {gpu_buffs.vertx_buffers[i].Get()};
-      con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, strides, offsets);
-      con->IASetIndexBuffer(gpu_buffs.index_buffers[i].Get(),
-                            DXGI_FORMAT_R32_UINT, 0);
       con->VSSetConstantBuffers(0, 1,
                                 gpu_buffs.const_buffers[i].GetAddressOf());
+      ID3D11Buffer* const vbuff[] = {gpu_buffs.vertx_buffers[i].Get()};
+      con->IASetVertexBuffers(0, ARRAYSIZE(vbuff), vbuff, strides, offsets);
+      con->IASetIndexBuffer(gpu_buffs.index_buffers[i].Get(),
+                            DXGI_FORMAT_R32_UINT, 0);
     }
     // Draw.
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
