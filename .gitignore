@@ -1,1 +1,5 @@
 build/
+asset/image_viewer/
+*.exe
+*.zip
+*.obj
