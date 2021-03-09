@@ -39,11 +39,6 @@ class Renderer {
   GW::GRAPHICS::GDirectX11Surface d3d;
   // Render Objects
   ArraysToGpu gpu_buffs;
-  /*
-  Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer;
-  */
   Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
@@ -138,7 +133,8 @@ class Renderer {
     creator->Release();
     // Push render objects.
     gpu_buffs.PushNewModel(test_pyramid_data, test_pyramid_vertexcount,
-                           test_pyramid_indicies, test_pyramid_indexcount);
+                           test_pyramid_indicies, test_pyramid_indexcount,
+                           shaderVars);
   }
   void Render() {
     // grab the context & render target

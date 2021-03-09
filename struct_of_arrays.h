@@ -36,17 +36,20 @@ struct ArraysToGpu {
 
  public:
   void PushNewModel(const OBJ_VERT*, const unsigned, const unsigned int*,
-                    const unsigned);
+                    const unsigned, SimpleMats);
 };
 
 void ArraysToGpu::PushNewModel(const OBJ_VERT* vtx, const unsigned v_count,
-                               const unsigned int* ind,
-                               const unsigned i_count) {
+                               const unsigned int* ind, const unsigned i_count,
+                               SimpleMats cam) {
   size_t i = mats.size();
+  mats.push_back(cam);
   // Create Matrix
+  /*
   mats.push_back(SimpleMats{GW::MATH::GIdentityMatrixF,
-                            GW::MATH::GIdentityMatrixF,
-                            GW::MATH::GIdentityMatrixF});
+                               GW::MATH::GIdentityMatrixF,
+                               GW::MATH::GIdentityMatrixF});
+                               */
   D3D11_SUBRESOURCE_DATA cData = {&mats[i], 0, 0};
   CD3D11_BUFFER_DESC cDesc(sizeof(mats[i]), D3D11_BIND_CONSTANT_BUFFER);
   // Create Constant Buffer
