@@ -13,7 +13,7 @@
 const char* vertexShaderSource = R"(
 // an ultra simple hlsl vertex shader
 #pragma pack_matrix(row_major)
-cbuffer IntoGpu {
+cbuffer SimpleMats {
    matrix w, v, p;
 };
 float4 main(float3 inputVertex : POSITION) : SV_POSITION
@@ -154,14 +154,17 @@ class Renderer {
     // Send buffers to GPU.
     for (unsigned int i = 0; i < 1; i++) {
       // for (unsigned int i = 0; i < gpu_buffs.vertx_buffers.size(); i++) {
-      // move pyramid
-      // con->UpdateSubresource();
       con->VSSetConstantBuffers(0, 1,
                                 gpu_buffs.const_buffers[i].GetAddressOf());
       ID3D11Buffer* const vbuff[] = {gpu_buffs.vertx_buffers[i].Get()};
       con->IASetVertexBuffers(0, ARRAYSIZE(vbuff), vbuff, strides, offsets);
       con->IASetIndexBuffer(gpu_buffs.index_buffers[i].Get(),
                             DXGI_FORMAT_R32_UINT, 0);
+      // Move
+      cam_mat.RotationYF(shaderVars.w, 0.01f, shaderVars.w);
+      con->UpdateSubresource(gpu_buffs.const_buffers[i].Get(), 0, nullptr,
+                             static_cast<void*>(&shaderVars),
+                             sizeof(SimpleMats), 0);
     }
     // Draw.
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
