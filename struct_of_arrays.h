@@ -18,18 +18,8 @@ struct SimpleMats {
   GW::MATH::GMATRIXF w, v, p;
 };
 
-/*
-struct SimpleBuffer {
-  SimpleMats m;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> c;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> v;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> i;
-};
-*/
-
 struct ArraysToGpu {
   std::vector<SimpleMats> mats;
-  // TODO: These really should all be one buffer of tuples.
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> const_buffers;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> vertx_buffers;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> index_buffers;

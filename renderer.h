@@ -34,9 +34,12 @@ SimpleOutVert main(  float3 inputVertex : POSITION,
 
 // Simple Pixel Shader
 const char* pixelShaderSource = R"(
+Texture2D inTex;
+SamplerState sam;
+
 float4 main(float2 uv : TEXTURE) : SV_TARGET {
-   
-	return float4(uv.x,uv.y,1.0f,0);
+   float4 color = inTex.Sample(sam, uv);
+	return color;
 }
 )";
 
@@ -163,6 +166,9 @@ class Renderer {
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
     con->IASetInputLayout(vertexFormat.Get());
+    // Temp: Set texture
+    ID3D11ShaderResourceView* const srvs[] = {shaderView.Get()};
+    con->PSSetShaderResources(0, 1, srvs);
     // Send buffers to GPU.
     for (unsigned int i = 0; i < 1; i++) {
       // for (unsigned int i = 0; i < gpu_buffs.vertx_buffers.size(); i++) {
@@ -173,10 +179,12 @@ class Renderer {
       con->IASetIndexBuffer(gpu_buffs.index_buffers[i].Get(),
                             DXGI_FORMAT_R32_UINT, 0);
       // Move
-      cam_mat.RotationYF(shaderVars.w, 0.01f, shaderVars.w);
-      con->UpdateSubresource(gpu_buffs.const_buffers[i].Get(), 0, nullptr,
-                             static_cast<void*>(&shaderVars),
-                             sizeof(SimpleMats), 0);
+      if (false) {
+        cam_mat.RotationYF(shaderVars.w, 0.01f, shaderVars.w);
+        con->UpdateSubresource(gpu_buffs.const_buffers[i].Get(), 0, nullptr,
+                               static_cast<void*>(&shaderVars),
+                               sizeof(SimpleMats), 0);
+      }
     }
     // Draw.
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -185,6 +193,7 @@ class Renderer {
     view->Release();
     con->Release();
   }
+
   ~Renderer() {
     // ComPtr will auto release so nothing to do here
   }
