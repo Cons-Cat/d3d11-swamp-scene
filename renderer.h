@@ -19,15 +19,18 @@ cbuffer SimpleMats {
 
 struct SimpleOutVert {
    float2 uv : UVW;
+   float3 nrm : NORMAL;
    float4 pos : SV_POSITION;
 };
 
 SimpleOutVert main(  float3 inputVertex : POSITION,
-                     float3 texCoord : UVW) {
+                     float3 texCoord : UVW,
+                     float3 normal : NORMAL) {
    SimpleOutVert output;
+   output.uv = texCoord.xy;
+   output.nrm = mul(normal, w);
 	float4 in_vert = float4(inputVertex, 1);
    output.pos = mul(mul(mul(in_vert, w),v),p);
-   output.uv = texCoord.xy;
    return output;
 }
 )";
@@ -37,9 +40,14 @@ const char* pixelShaderSource = R"(
 Texture2D inTex;
 SamplerState sam;
 
-float4 main(float2 uv : TEXTURE) : SV_TARGET {
+float4 main(float2 uv : TEXTURE,
+            float3 nrm : NORMAL) : SV_TARGET {
    float4 color = inTex.Sample(sam, uv);
-	return color;
+
+   // Day 7 vid
+   float3 lightDirWorld = {-1,-1, 1};
+   float lightRatio = dot(-lightDirWorld, normalize(nrm));
+	return color * lightRatio;
 }
 )";
 
@@ -179,7 +187,7 @@ class Renderer {
       con->IASetIndexBuffer(gpu_buffs.index_buffers[i].Get(),
                             DXGI_FORMAT_R32_UINT, 0);
       // Move
-      if (false) {
+      if (true) {
         cam_mat.RotationYF(shaderVars.w, 0.01f, shaderVars.w);
         con->UpdateSubresource(gpu_buffs.const_buffers[i].Get(), 0, nullptr,
                                static_cast<void*>(&shaderVars),
