@@ -2,6 +2,7 @@
 // required for compiling shaders on the fly, consider pre-compiling instead
 #include <d3dcompiler.h>
 
+#include "DDSTextureLoader.h"
 #include "asset/test_pyramid.h"
 #include "shader/pixl_simple.h"
 #include "shader/vert_simple.h"
@@ -11,24 +12,31 @@
 
 // Simple Vertex Shader
 const char* vertexShaderSource = R"(
-// an ultra simple hlsl vertex shader
 #pragma pack_matrix(row_major)
 cbuffer SimpleMats {
    matrix w, v, p;
 };
-float4 main(float3 inputVertex : POSITION) : SV_POSITION
-{
-	float4 output = float4(inputVertex, 1);
-   return mul(mul(mul(output, w),v),p);
+
+struct SimpleOutVert {
+   float2 uv : UVW;
+   float4 pos : SV_POSITION;
+};
+
+SimpleOutVert main(  float3 inputVertex : POSITION,
+                     float3 texCoord : UVW) {
+   SimpleOutVert output;
+	float4 in_vert = float4(inputVertex, 1);
+   output.pos = mul(mul(mul(in_vert, w),v),p);
+   output.uv = texCoord.xy;
+   return output;
 }
 )";
 
 // Simple Pixel Shader
 const char* pixelShaderSource = R"(
-// an ultra simple hlsl pixel shader
-float4 main() : SV_TARGET 
-{	
-	return float4(0.25f,0.0f,1.0f,0);
+float4 main(float2 uv : TEXTURE) : SV_TARGET {
+   
+	return float4(uv.x,uv.y,1.0f,0);
 }
 )";
 
@@ -42,7 +50,8 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
-
+  // Texture
+  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shaderView;
   // Math
   GW::MATH::GMatrix cam_mat;
   SimpleMats shaderVars;
@@ -64,6 +73,9 @@ class Renderer {
     win = _win;
     d3d = _d3d;
     d3d.GetDevice((void**)&creator);
+    // Load texture
+    HRESULT hr = CreateDDSTextureFromFile(creator, L"../asset/my_face.dds",
+                                          nullptr, shaderView.GetAddressOf());
 
     UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if _DEBUG

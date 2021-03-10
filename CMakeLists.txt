@@ -26,7 +26,9 @@ add_executable (GreenScreen
 	renderer.h
 	struct_of_arrays.h
 	asset/test_pyramid.h
-	#../asset/pyramid.h
+	#asset/my_face.dds
+	DDSTextureLoader.h
+	DDSTextureLoader.cpp
 	${VERTEX_SHADERS}
 	${PIXEL_SHADERS}
 )
