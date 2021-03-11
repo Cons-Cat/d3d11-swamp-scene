@@ -4,6 +4,7 @@
 
 #include "DDSTextureLoader.h"
 #include "asset/test_pyramid.h"
+//#include "input.h"
 #include "shader/pixl_simple.h"
 #include "shader/vert_simple.h"
 #include "struct_of_arrays.h"
@@ -65,21 +66,20 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shaderView;
   // Math
   GW::MATH::GMatrix cam_mat;
-  SimpleMats shaderVars;
 
  public:
   Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX11Surface _d3d) {
     // math
     cam_mat.Create();
-    cam_mat.IdentityF(shaderVars.w);
+    cam_mat.IdentityF(INPUTTER::camera.w);
     cam_mat.LookAtLHF(GW::MATH::GVECTORF{1, 0.5f, -2},
                       GW::MATH::GVECTORF{0, 0.25f, 0},
-                      GW::MATH::GVECTORF{0, 1, 0}, shaderVars.v);
+                      GW::MATH::GVECTORF{0, 1, 0}, INPUTTER::camera.v);
     float ar = 1;
     d3d.GetAspectRatio(ar);
 
     cam_mat.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN(70), ar, 0.1f, 1000,
-                                 shaderVars.p);
+                                 INPUTTER::camera.p);
     // rest of setup.
     win = _win;
     d3d = _d3d;
@@ -157,8 +157,9 @@ class Renderer {
     // Push render objects.
     gpu_buffs.PushNewModel(test_pyramid_data, test_pyramid_vertexcount,
                            test_pyramid_indicies, test_pyramid_indexcount,
-                           shaderVars);
+                           INPUTTER::camera);
   }
+
   void Render() {
     // grab the context & render target
     ID3D11DeviceContext* con;
@@ -188,9 +189,9 @@ class Renderer {
                             DXGI_FORMAT_R32_UINT, 0);
       // Move
       if (true) {
-        cam_mat.RotationYF(shaderVars.w, 0.01f, shaderVars.w);
+        cam_mat.RotationYF(INPUTTER::camera.w, 0.01f, INPUTTER::camera.w);
         con->UpdateSubresource(gpu_buffs.const_buffers[i].Get(), 0, nullptr,
-                               static_cast<void*>(&shaderVars),
+                               static_cast<void*>(&INPUTTER::camera),
                                sizeof(SimpleMats), 0);
       }
     }
