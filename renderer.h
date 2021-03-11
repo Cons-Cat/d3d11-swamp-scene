@@ -64,26 +64,14 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
   // Texture
   Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> shaderView;
-  // Math
-  GW::MATH::GMatrix cam_mat;
 
  public:
   Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX11Surface _d3d) {
-    // math
-    cam_mat.Create();
-    cam_mat.IdentityF(INPUTTER::camera.w);
-    cam_mat.LookAtLHF(GW::MATH::GVECTORF{1, 0.5f, -2},
-                      GW::MATH::GVECTORF{0, 0.25f, 0},
-                      GW::MATH::GVECTORF{0, 1, 0}, INPUTTER::camera.v);
-    float ar = 1;
-    d3d.GetAspectRatio(ar);
-
-    cam_mat.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN(70), ar, 0.1f, 1000,
-                                 INPUTTER::camera.p);
     // rest of setup.
     win = _win;
     d3d = _d3d;
     d3d.GetDevice((void**)&creator);
+    INPUTTER::init_camera(d3d);
     // Load texture
     HRESULT hr = CreateDDSTextureFromFile(creator, L"../asset/my_face.dds",
                                           nullptr, shaderView.GetAddressOf());
@@ -188,12 +176,14 @@ class Renderer {
       con->IASetIndexBuffer(gpu_buffs.index_buffers[i].Get(),
                             DXGI_FORMAT_R32_UINT, 0);
       // Move
+      /*
       if (true) {
         cam_mat.RotationYF(INPUTTER::camera.w, 0.01f, INPUTTER::camera.w);
         con->UpdateSubresource(gpu_buffs.const_buffers[i].Get(), 0, nullptr,
                                static_cast<void*>(&INPUTTER::camera),
                                sizeof(SimpleMats), 0);
       }
+      */
     }
     // Draw.
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
