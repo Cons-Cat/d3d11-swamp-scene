@@ -4,8 +4,7 @@
 
 namespace INPUTTER {
 extern SimpleMats camera;
-extern GW::MATH::GMatrix m;
-void init_camera(GW::GRAPHICS::GDirectX11Surface);
+void init_camera(float);
 void walk_camera();
 void look_camera();
 }  // namespace INPUTTER

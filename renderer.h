@@ -4,8 +4,8 @@
 
 #include "DDSTextureLoader.h"
 #include "asset/test_pyramid.h"
-#include "shader/pixl_simple.h"
-#include "shader/vert_simple.h"
+//#include "shader/pixl_simple.h"
+//#include "shader/vert_simple.h"
 #include "struct_of_arrays.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -66,11 +66,14 @@ class Renderer {
 
  public:
   Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX11Surface _d3d) {
+    // Math.
+    float ar = 1;
+    d3d.GetAspectRatio(ar);
+    INPUTTER::init_camera(ar);
     // rest of setup.
     win = _win;
     d3d = _d3d;
     d3d.GetDevice((void**)&creator);
-    INPUTTER::init_camera(d3d);
     // Load texture
     HRESULT hr = CreateDDSTextureFromFile(creator, L"../asset/my_face.dds",
                                           nullptr, shaderView.GetAddressOf());
