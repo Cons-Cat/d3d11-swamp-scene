@@ -1,5 +1,7 @@
 #include "struct_of_arrays.h"
 
+#include "input.h"
+
 ID3D11Device* creator;
 
 void ArraysToGpu::PushNewModel(const OBJ_VERT* vtx, const unsigned v_count,
@@ -26,4 +28,8 @@ void ArraysToGpu::PushNewModel(const OBJ_VERT* vtx, const unsigned v_count,
   return;
 };
 
-void ArraysToGpu::UpdateView(size_t ind) { return; }
+void ArraysToGpu::UpdateView() {
+  for (size_t i = 0; i < mats.size(); i++) {
+    mats[i].v = INPUTTER::camera.v;
+  }
+}

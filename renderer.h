@@ -169,6 +169,7 @@ class Renderer {
     ID3D11ShaderResourceView* const srvs[] = {shaderView.Get()};
     con->PSSetShaderResources(0, 1, srvs);
     // Send buffers to GPU.
+    // gpu_buffs.UpdateView();
     for (unsigned int i = 0; i < 1; i++) {
       // for (unsigned int i = 0; i < gpu_buffs.vertx_buffers.size(); i++) {
       con->VSSetConstantBuffers(0, 1,
@@ -186,7 +187,9 @@ class Renderer {
                                sizeof(SimpleMats), 0);
       }
       */
-      // gpu_buffs.UpdateView(i);
+      con->UpdateSubresource(gpu_buffs.const_buffers[i].Get(), 0, nullptr,
+                             static_cast<void*>(&INPUTTER::camera),
+                             sizeof(SimpleMats), 0);
     }
     // Draw.
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

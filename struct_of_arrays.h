@@ -19,8 +19,8 @@ typedef struct _OBJ_VERT_ {
 // TODO: Find a better place.
 extern ID3D11Device* creator;
 
-// typedef struct ArraysToGpu ArraysToGpu;
 struct ArraysToGpu {
+  // TODO: All v fields should be contiguous.
   std::vector<SimpleMats> mats;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> const_buffers;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> vertx_buffers;
@@ -29,5 +29,5 @@ struct ArraysToGpu {
  public:
   void PushNewModel(const OBJ_VERT*, const unsigned, const unsigned int*,
                     const unsigned, SimpleMats);
-  void UpdateView(size_t);
+  void UpdateView();
 };
