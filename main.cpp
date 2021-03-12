@@ -46,6 +46,7 @@ int main() {
           // Mutate universe state.
           INPUTTER::walk_camera();
           INPUTTER::look_camera();
+          INPUTTER::update_camera();
           // Send to GPU.
           renderer.Render();
           swap->Present(1, 0);

@@ -69,7 +69,7 @@ class Renderer {
     // Math.
     float ar = 1;
     d3d.GetAspectRatio(ar);
-    INPUTTER::init_camera(ar);
+    INPUTTER::init_camera(ar, _win);
     // rest of setup.
     win = _win;
     d3d = _d3d;
