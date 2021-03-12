@@ -11,8 +11,6 @@
 // With what we want & what we don't defined we can include the API
 
 #include "../Gateware/Gateware.h"
-#include "input.h"
-#include "renderer.h"  // example rendering code (not Gateware code!)
 
 // open some namespaces to compact the code a bit
 using namespace GW;
@@ -20,6 +18,9 @@ using namespace CORE;
 using namespace SYSTEM;
 using namespace GRAPHICS;
 // lets pop a window and use D3D11 to clear to a green screen
+
+#include "input.h"
+#include "renderer.h"  // example rendering code (not Gateware code!)
 
 int main() {
   GWindow win;

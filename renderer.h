@@ -4,7 +4,6 @@
 
 #include "DDSTextureLoader.h"
 #include "asset/test_pyramid.h"
-//#include "input.h"
 #include "shader/pixl_simple.h"
 #include "shader/vert_simple.h"
 #include "struct_of_arrays.h"
@@ -184,6 +183,7 @@ class Renderer {
                                sizeof(SimpleMats), 0);
       }
       */
+      // gpu_buffs.UpdateView(i);
     }
     // Draw.
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

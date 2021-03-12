@@ -25,7 +25,10 @@ add_executable (GreenScreen
 	main.cpp
 	renderer.h
 	input.h
+	input.cpp
+	matrices.h
 	struct_of_arrays.h
+	struct_of_arrays.cpp
 	asset/test_pyramid.h
 	#asset/my_face.dds
 	DDSTextureLoader.h

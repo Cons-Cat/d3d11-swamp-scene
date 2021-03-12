@@ -1,5 +1,9 @@
 build/
 asset/image_viewer/
+cmake-build-debug/
 *.exe
 *.zip
 *.obj
+*.jpg
+shader/pixl_simple.h
+shader/vert_simple.h
