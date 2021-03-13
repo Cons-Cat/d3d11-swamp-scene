@@ -53,8 +53,17 @@ void INPUTTER::look_camera() {
   input.GetMousePosition(temp_x, temp_y);
   look_angle_x = (mouse_x - temp_x) / mouse_speed;
   look_angle_y = (mouse_y - temp_y) / mouse_speed;
-  m.RotationYF(camera.v, look_angle_x, camera.v);
-  m.RotationXF(camera.v, look_angle_y, camera.v);
+  // Attempt 1:
+  {
+      // m.RotationYF(camera.v, look_angle_x, camera.v);
+      // m.RotationXF(camera.v, look_angle_y, camera.v);
+  }  //
+  // Attempt 2:
+  {
+    GW::MATH::GMATRIXF temp_mat;
+    m.RotationYawPitchRollF(look_angle_x, look_angle_y, 0, temp_mat);
+    m.MultiplyMatrixF(camera.v, temp_mat, camera.v);
+  }  //
   mouse_x = temp_x;
   mouse_y = temp_y;
 }
