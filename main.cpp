@@ -39,14 +39,14 @@ int main() {
         IDXGISwapChain* swap;
         ID3D11DeviceContext* con;
         ID3D11RenderTargetView* view;
+        // Mutate universe state.
+        INPUTTER::walk_camera();
+        INPUTTER::look_camera();
+        INPUTTER::update_camera();
         if (+d3d11.GetImmediateContext((void**)&con) &&
             +d3d11.GetRenderTargetView((void**)&view) &&
             +d3d11.GetSwapchain((void**)&swap)) {
           con->ClearRenderTargetView(view, clr);
-          // Mutate universe state.
-          INPUTTER::walk_camera();
-          INPUTTER::look_camera();
-          INPUTTER::update_camera();
           // Send to GPU.
           renderer.Render();
           swap->Present(1, 0);

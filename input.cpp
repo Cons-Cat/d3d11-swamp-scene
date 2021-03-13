@@ -9,6 +9,11 @@ GW::INPUT::GInput input;
 GW::MATH::GVECTORF up = GW::MATH::GVECTORF{0, 1, 0};
 float walk_speed = 0.2f;
 GW::MATH::GVECTORF cam_pos = GW::MATH::GVECTORF{1, 0.5f, -2};
+float mouse_x = 0;
+float mouse_y = 0;
+float mouse_speed = 200.0f;
+float look_angle_x = 0;
+float look_angle_y = 0;
 GW::MATH::GVECTORF cam_look = GW::MATH::GVECTORF{0, 0.25f, 0};
 
 GW::MATH::GMatrix m;
@@ -42,6 +47,16 @@ void INPUTTER::walk_camera() {
   m.InverseF(inverse, camera.v);
 }
 
-void INPUTTER::look_camera() {}
+void INPUTTER::look_camera() {
+  float temp_x;
+  float temp_y;
+  input.GetMousePosition(temp_x, temp_y);
+  look_angle_x = (mouse_x - temp_x) / mouse_speed;
+  look_angle_y = (mouse_y - temp_y) / mouse_speed;
+  m.RotationYF(camera.v, look_angle_x, camera.v);
+  m.RotationXF(camera.v, look_angle_y, camera.v);
+  mouse_x = temp_x;
+  mouse_y = temp_y;
+}
 
 void INPUTTER::update_camera() {}
