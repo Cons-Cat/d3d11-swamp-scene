@@ -161,17 +161,15 @@ class Renderer {
     con->OMSetRenderTargets(ARRAYSIZE(views), views, nullptr);
     const UINT strides[] = {sizeof(OBJ_VERT)};
     const UINT offsets[] = {0};
+    con->IASetInputLayout(vertexFormat.Get());
     // Set shaders.
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
-    con->IASetInputLayout(vertexFormat.Get());
     // Temp: Set texture
     ID3D11ShaderResourceView* const srvs[] = {shaderView.Get()};
     con->PSSetShaderResources(0, 1, srvs);
     // Send buffers to GPU.
-    // gpu_buffs.UpdateView();
-    for (unsigned int i = 0; i < 1; i++) {
-      // for (unsigned int i = 0; i < gpu_buffs.vertx_buffers.size(); i++) {
+    for (unsigned int i = 0; i < gpu_buffs.vertx_buffers.size(); i++) {
       con->VSSetConstantBuffers(0, 1,
                                 gpu_buffs.const_buffers[i].GetAddressOf());
       ID3D11Buffer* const vbuff[] = {gpu_buffs.vertx_buffers[i].Get()};

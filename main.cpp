@@ -42,7 +42,6 @@ int main() {
         // Mutate universe state.
         INPUTTER::walk_camera();
         INPUTTER::look_camera();
-        INPUTTER::update_camera();
         if (+d3d11.GetImmediateContext((void**)&con) &&
             +d3d11.GetRenderTargetView((void**)&view) &&
             +d3d11.GetSwapchain((void**)&swap)) {
