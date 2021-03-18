@@ -145,9 +145,17 @@ class Renderer {
     // free temporary handle
     creator->Release();
     // Push render objects.
-    gpu_buffs.PushNewModel(test_pyramid_data, test_pyramid_vertexcount,
-                           test_pyramid_indicies, test_pyramid_indexcount,
-                           INPUTTER::camera);
+    OBJ_VERT* data;
+    unsigned int* inds;
+
+#define LOAD_MODEL(NAME)                        \
+  ModelTemplate model_##NAME##{                 \
+      &##NAME##_data[0], &##NAME##_indicies,    \
+      sizeof(##NAME##_data) / sizeof(OBJ_VERT), \
+      sizeof(##NAME##_indicies) / sizeof(unsigned int)};
+
+    LOAD_MODEL(test_pyramid);
+    gpu_buffs.PushNewModel(model_test_pyramid, INPUTTER::camera);
   }
 
   void Render() {

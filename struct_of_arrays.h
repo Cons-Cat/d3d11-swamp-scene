@@ -6,16 +6,6 @@
 
 #include "matrices.h"
 
-#ifndef __OBJ_VERT__
-typedef struct _OBJ_VERT_ {
-  float pos[3];  // Left-handed +Z forward coordinate w not provided, assumed to
-                 // be 1.
-  float uvw[3];  // D3D/Vulkan style top left 0,0 coordinate.
-  float nrm[3];  // Provided direct from obj file, may or may not be normalized.
-} OBJ_VERT;
-#define __OBJ_VERT__
-#endif
-
 // TODO: Find a better place.
 extern ID3D11Device* creator;
 
@@ -25,9 +15,10 @@ struct ArraysToGpu {
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> const_buffers;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> vertx_buffers;
   std::vector<Microsoft::WRL::ComPtr<ID3D11Buffer>> index_buffers;
+  std::vector<ModelTemplate> models;
 
  public:
-  void PushNewModel(const OBJ_VERT*, const unsigned, const unsigned int*,
-                    const unsigned, SimpleMats);
+  void PushNewModel(ModelTemplate, SimpleMats);
   void UpdateView();
+  void TranslateModel(const unsigned, float, float, float);
 };
