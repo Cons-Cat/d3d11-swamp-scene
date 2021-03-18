@@ -33,25 +33,30 @@ int main() {
       if (+msgs.Find(GWindow::Events::RESIZE, true))
         clr[2] += 0.01f;  // move towards a cyan as they resize
     });
-    if (+d3d11.Create(win, 0)) {
+    if (+d3d11.Create(win, GW::GRAPHICS::DEPTH_BUFFER_SUPPORT)) {
       Renderer renderer(win, d3d11);
       while (+win.ProcessWindowEvents()) {
         IDXGISwapChain* swap;
         ID3D11DeviceContext* con;
         ID3D11RenderTargetView* view;
+        ID3D11DepthStencilView* depth;
         // Mutate universe state.
         INPUTTER::walk_camera();
         INPUTTER::look_camera();
         if (+d3d11.GetImmediateContext((void**)&con) &&
             +d3d11.GetRenderTargetView((void**)&view) &&
-            +d3d11.GetSwapchain((void**)&swap)) {
+            +d3d11.GetSwapchain((void**)&swap) &&
+            +d3d11.GetDepthStencilView((void**)&depth)) {
           con->ClearRenderTargetView(view, clr);
+          con->ClearDepthStencilView(depth, D3D11_CLEAR_DEPTH, 1, 0);
           // Send to GPU.
+          renderer.Update();
           renderer.Render();
           swap->Present(1, 0);
           // release incremented COM reference counts
           swap->Release();
           view->Release();
+          depth->Release();
           con->Release();
         }
       }
