@@ -16,16 +16,19 @@ cbuffer IntoGpu {
 struct OUT_VERT
 {
    float2 uv : TEXTURE;
+   float3 nrm : NORMAL;
    float4 pos : SV_POSITION;
 };
 
 OUT_VERT main(float3 inputVertex : POSITION,
-              float3 texCoord : UVW)
+              float3 texCoord : UVW,
+              float3 normal : NORMAL)
 {
    OUT_VERT output;
 	output.pos = float4(inputVertex, 1);
    output.pos = mul(mul(mul(output.pos, w),v),p);
    output.uv = texCoord.xy;
+   output.nrm = mul(normal, w);
    return output;
 }
 )";
@@ -35,10 +38,14 @@ const char* pixelShaderSource = R"(
 Texture2D in_tex;
 SamplerState sam;
 
-float4 main(float2 uv : TEXTURE) : SV_TARGET 
+float4 main(float2 uv : TEXTURE,
+            float3 nrm : NORMAL) : SV_TARGET 
 {
    float4 color = in_tex.Sample(sam, uv);
-	return color;
+   float3 lightDir = { -1, -1, 1 };
+   lightDir = normalize(lightDir);
+   float lightR = dot(-lightDir, normalize(nrm));
+	return color * lightR;
 }
 )";
 
@@ -178,7 +185,6 @@ class Renderer {
     // now we can draw
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     con->DrawIndexed(test_pyramid_vertexcount + 3, 0, 0);
-    // con->DrawIndexed(test_pyramid_vertexcount + 3, 0, 0);
 
     // release temp handles
     view->Release();
