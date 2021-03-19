@@ -82,6 +82,17 @@ class Renderer {
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> diffuse;
   };
 
+  struct INSTANCED_MESH {
+    Microsoft::WRL::ComPtr<ID3D11Buffer> instanceBuffer;
+    unsigned int instance_count = 1;
+    OBJ_MESH obj_mesh;
+  };
+
+  struct INSTANCES_POSITION_BUFFER {
+    // GW::MATH::GVECTORF position;
+    float position[3];
+  };
+
   // Math
   GW::MATH::GMatrix m;
   struct IntoGpu {
@@ -91,7 +102,9 @@ class Renderer {
 
   // Make objects for models here.
   OBJ_MESH cat_pyramid;
-  OBJ_MESH willow;
+  INSTANCED_MESH willows;
+  // INSTANCES_POSITION_BUFFER* willow_instances;
+  std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
 
  public:
   OBJ_MESH LoadObjMesh(const OBJ_VERT* verts, unsigned num_verts,
@@ -153,7 +166,6 @@ class Renderer {
   void Update() {
     // Update a mesh
     m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
-    m.RotationYF(willow.world, 0.01f, willow.world);
     // Update camera
   }
 
@@ -198,12 +210,29 @@ class Renderer {
                               test_pyramid_indicies, test_pyramid_indexcount,
                               L"../asset/my_face.dds");
 
-    willow = LoadObjMesh(willow_data, willow_vertexcount, willow_indicies,
-                         willow_indexcount, L"../asset/treeWillow_Trunk_D.dds");
-    m.TranslatelocalF(willow.world, GW::MATH::GVECTORF{0, 0, 10.0f},
-                      willow.world);
-    m.ScalingF(willow.world, GW::MATH::GVECTORF{0.1f, 0.1f, 0.1f},
-               willow.world);
+    // Load the willow mesh
+    willows.obj_mesh =
+        LoadObjMesh(willow_data, willow_vertexcount, willow_indicies,
+                    willow_indexcount, L"../asset/treeWillow_Trunk_D.dds");
+    m.TranslatelocalF(willows.obj_mesh.world, GW::MATH::GVECTORF{0, 0, 10.0f},
+                      willows.obj_mesh.world);
+    m.ScalingF(willows.obj_mesh.world, GW::MATH::GVECTORF{0.1f, 0.1f, 0.1f},
+               willows.obj_mesh.world);
+
+    // Instance some willows
+    D3D11_BUFFER_DESC instanceBufferDesc;
+    D3D11_SUBRESOURCE_DATA instanceData;
+
+    willows_instances.push_back({0, 0, -40});
+    instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    instanceBufferDesc.ByteWidth =
+        sizeof(INSTANCES_POSITION_BUFFER) * willows.instance_count;
+    instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    instanceBufferDesc.CPUAccessFlags = 0;
+    instanceBufferDesc.MiscFlags = 0;
+    instanceData.pSysMem = &willows_instances[0];
+    creator->CreateBuffer(&instanceBufferDesc, &instanceData,
+                          &willows.instanceBuffer);
 
     // Create Constant Buffer
     D3D11_SUBRESOURCE_DATA cData = {&shaderVars, 0, 0};
@@ -237,19 +266,26 @@ class Renderer {
                                  pixelShader.GetAddressOf());
     } else
       std::cout << (char*)errors->GetBufferPointer() << std::endl;
+
     // Create Input Layout
     D3D11_INPUT_ELEMENT_DESC format[] = {
+        // Vertex buffer
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"UVW", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT,
          D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+
+        // Instance buffer
+        {"INSTANCEPOS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, 0,
+         D3D11_INPUT_PER_INSTANCE_DATA, 1},
     };
 
     creator->CreateInputLayout(
         format, ARRAYSIZE(format), vsBlob->GetBufferPointer(),
         vsBlob->GetBufferSize(), vertexFormat.GetAddressOf());
+
     // free temporary handle
     creator->Release();
   }
@@ -274,14 +310,31 @@ class Renderer {
     con->IASetInputLayout(vertexFormat.Get());
 
     // move pyramid
-    // DrawObjMesh(cat_pyramid);
+    // DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
     /*DrawObjMesh(willow, willow_meshes[4].indexCount,
                 willow_meshes[4].indexOffset);
     DrawObjMesh(willow, willow_meshes[3].indexCount,
                 willow_meshes[3].indexOffset);
     DrawObjMesh(willow, willow_meshes[2].indexCount,
                 willow_meshes[2].indexOffset);*/
-    DrawObjMesh(willow, willow_indexcount, 0);
+    // DrawObjMesh(willows.obj_mesh, willow_indexcount, 0);
+
+    // Set texture
+    ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
+    con->PSSetShaderResources(0, 1, srvs);
+
+    // Instanced draw
+    con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    const UINT strides[] = {sizeof(OBJ_VERT)};
+    const UINT offsets[] = {0};
+
+    ID3D11Buffer* willow_instance_buffers[2] = {
+        willows.obj_mesh.vertexBuffer.Get(), willows.instanceBuffer.Get()};
+    con->IASetIndexBuffer(willows.obj_mesh.indexBuffer.Get(),
+                          DXGI_FORMAT_R32_UINT, 0);
+    con->IASetVertexBuffers(0, 2, willow_instance_buffers, strides, offsets);
+    con->DrawIndexedInstanced(willow_indexcount, willows.instance_count, 0, 0,
+                              0);
 
     // release temp handles
     view->Release();
