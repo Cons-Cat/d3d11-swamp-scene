@@ -34,7 +34,7 @@ void ArraysToGpu::PushNewModel(ModelTemplate model, SimpleMats cam) {
 
 void ArraysToGpu::UpdateView() {
   for (size_t i = 0; i < mats.size(); i++) {
-    mats[i].v = INPUTTER::camera.v;
+    // mats[i].v = INPUTTER::camera.v;
   }
 }
 

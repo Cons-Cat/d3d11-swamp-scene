@@ -3,9 +3,10 @@
 #include "matrices.h"
 
 namespace INPUTTER {
-extern SimpleMats camera;
+extern GW::MATH::GMATRIXF camera;
+extern float walk_speed;
+extern GW::INPUT::GInput input;
 void init_camera(float, GW::SYSTEM::GWindow&);
-void walk_camera();
-void look_camera();
-void update_camera();
+// void walk_camera();
+// void look_camera();
 }  // namespace INPUTTER

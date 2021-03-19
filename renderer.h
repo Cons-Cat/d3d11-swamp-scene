@@ -200,28 +200,49 @@ class Renderer {
   }
 
   void Update() {
+#define EVAL_INPUT(DIR)                               \
+  float o_##DIR## = 0;                                \
+  INPUTTER::input.GetState(G_KEY_##DIR##, o_##DIR##); \
+  float is_##DIR## = (o_##DIR## == 0 ? 0 : 1.0f);
+
     // Update a mesh
-    m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
+    // m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
     // Update camera
+    EVAL_INPUT(UP);
+    EVAL_INPUT(DOWN);
+    EVAL_INPUT(LEFT);
+    EVAL_INPUT(RIGHT);
+    float z = INPUTTER::walk_speed * (is_UP - is_DOWN);
+    float x = INPUTTER::walk_speed * (is_RIGHT - is_LEFT);
+
+    m.InverseF(shaderVars.v, INPUTTER::camera);
+
+    m.TranslatelocalF(INPUTTER::camera, GW::MATH::GVECTORF{x, 0, z},
+                      INPUTTER::camera);
+
+    m.InverseF(INPUTTER::camera, shaderVars.v);
   }
 
   Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX11Surface _d3d) {
     // math
     m.Create();
     m.IdentityF(shaderVars.w);
-    m.LookAtLHF(GW::MATH::GVECTORF{1, 0.5f, -2},
-                GW::MATH::GVECTORF{0, 0.25f, 0}, GW::MATH::GVECTORF{0, 1, 0},
-                shaderVars.v);
-    float ar = 1;
-    d3d.GetAspectRatio(ar);
 
-    m.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN(70), ar, 0.1f, 1000,
-                           shaderVars.p);
     // rest of setup.
     win = _win;
     d3d = _d3d;
     ID3D11Device* creator;
     d3d.GetDevice((void**)&creator);
+
+    // Camera
+    float ar = 1;
+    d3d.GetAspectRatio(ar);
+    m.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN(70), ar, 0.1f, 1000,
+                           shaderVars.p);
+    INPUTTER::init_camera(ar, win);
+
+    m.LookAtLHF(GW::MATH::GVECTORF{1, 1, -2}, GW::MATH::GVECTORF{0, 1, 0},
+                GW::MATH::GVECTORF{0, 1, 0}, shaderVars.v);
 
     D3D11_BLEND_DESC blendStateDesc;
     ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
@@ -361,13 +382,7 @@ class Renderer {
     con->IASetInputLayout(vertexFormat.Get());
 
     // move pyramid
-    // DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
-    /*DrawObjMesh(willow, willow_meshes[4].indexCount,
-                willow_meshes[4].indexOffset);
-    DrawObjMesh(willow, willow_meshes[3].indexCount,
-                willow_meshes[3].indexOffset);
-    DrawObjMesh(willow, willow_meshes[2].indexCount,
-                willow_meshes[2].indexOffset);*/
+    DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
 
     // Set texture
     ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
