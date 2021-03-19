@@ -41,18 +41,18 @@ Texture2D in_tex;
 SamplerState sam;
 
 float4 main(float2 uv : TEXTURE,
-            float3 nrm : NORMAL) : SV_Target0 
+            float3 nrm : NORMAL) : SV_TARGET
 {
    float4 color = in_tex.Sample(sam, uv);
    float3 lightDir = { -1, -1, 1 };
    lightDir = normalize(lightDir);
    float lightR = dot(-lightDir, normalize(nrm));
 	color = color * lightR;
-   //return float4(0, 0, 0, 0.5f);
    if (color.a == 0) {
-      return float4(0, 0, 0, 0.0f);
+      discard;
+      return 0;
    } else {
-      color.a = 1;
+      color.a = color.a * 2;
       return color;
    }
 }
@@ -170,14 +170,14 @@ class Renderer {
 
     D3D11_BLEND_DESC blendStateDesc;
     ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
-    blendStateDesc.AlphaToCoverageEnable = FALSE;
-    blendStateDesc.IndependentBlendEnable = FALSE;
+    // blendStateDesc.AlphaToCoverageEnable = FALSE;
+    // blendStateDesc.IndependentBlendEnable = FALSE;
     blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
     blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
     blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
     blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
-    blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_DEST_ALPHA;
+    blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ZERO;
+    blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
     blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
     blendStateDesc.RenderTarget[0].RenderTargetWriteMask =
         D3D11_COLOR_WRITE_ENABLE_ALL;
@@ -267,7 +267,7 @@ class Renderer {
     con->IASetInputLayout(vertexFormat.Get());
 
     // move pyramid
-    DrawObjMesh(cat_pyramid);
+    // DrawObjMesh(cat_pyramid);
     DrawObjMesh(willow);
 
     // release temp handles
