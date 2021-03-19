@@ -48,11 +48,11 @@ float4 main(float2 uv : TEXTURE,
       discard;
       return 0;
    } else {
+      float temp_alpha = color.a;
       float3 lightDir = { -1, -1, 1 };
       lightDir = normalize(lightDir);
       float lightR = dot(-lightDir, normalize(nrm));
-      float temp_alpha = color.a;
-	   color = color * lightR;
+      color = color * lightR;
       color.a = temp_alpha;
       return color;
    }
@@ -144,6 +144,10 @@ class Renderer {
     con->DrawIndexed(index_count, index_offset, 0);
     // Release reference count
     con->Release();
+  }
+
+  void DrawObjSubmesh(const OBJ_MESH& subMesh) {
+    //
   }
 
   void Update() {
