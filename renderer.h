@@ -8,6 +8,7 @@
 #include "asset/willow.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
+
 // Simple Vertex Shader
 const char* vertexShaderSource = R"(
 #pragma pack_matrix(row_major)
@@ -29,6 +30,41 @@ OUT_VERT main(float3 inputVertex : POSITION,
    OUT_VERT output;
 	output.pos = float4(inputVertex, 1);
    output.pos = mul(mul(mul(output.pos, w),v),p);
+   output.uv = texCoord.xy;
+   output.nrm = mul(normal, w);
+   return output;
+}
+)";
+
+// Simple Instanced Vertex Shader
+const char* instancedVertexShaderSource = R"(
+#pragma pack_matrix(row_major)
+cbuffer IntoGpu {
+   matrix w, v, p;
+};
+
+struct OUT_VERT
+{
+   float2 uv : TEXTURE;
+   float3 nrm : NORMAL;
+   float4 pos : SV_POSITION;
+};
+
+OUT_VERT main(float3 inputVertex : POSITION,
+              float3 texCoord : UVW,
+              float3 normal : NORMAL,
+              float3 inst_pos : INSTANCEPOS
+)
+{
+   OUT_VERT output;
+   float4 inst_pos4 = float4(inst_pos, 1);
+	output.pos = float4(inputVertex, 1);
+   // Moving spaces
+   output.pos = mul(output.pos, w);
+   output.pos.x += inst_pos.x;
+   output.pos.y += inst_pos.y;
+   output.pos.z += inst_pos.z;
+   output.pos = mul(mul(output.pos,v),p);
    output.uv = texCoord.xy;
    output.nrm = mul(normal, w);
    return output;
@@ -67,6 +103,7 @@ class Renderer {
   // Rendering
   Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
+  Microsoft::WRL::ComPtr<ID3D11VertexShader> instancedVertexShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
   ID3D11BlendState* blendState;
@@ -84,12 +121,11 @@ class Renderer {
 
   struct INSTANCED_MESH {
     Microsoft::WRL::ComPtr<ID3D11Buffer> instanceBuffer;
-    unsigned int instance_count = 1;
+    unsigned int instance_count;
     OBJ_MESH obj_mesh;
   };
 
   struct INSTANCES_POSITION_BUFFER {
-    // GW::MATH::GVECTORF position;
     float position[3];
   };
 
@@ -103,7 +139,6 @@ class Renderer {
   // Make objects for models here.
   OBJ_MESH cat_pyramid;
   INSTANCED_MESH willows;
-  // INSTANCES_POSITION_BUFFER* willow_instances;
   std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
 
  public:
@@ -223,14 +258,18 @@ class Renderer {
     D3D11_BUFFER_DESC instanceBufferDesc;
     D3D11_SUBRESOURCE_DATA instanceData;
 
-    willows_instances.push_back({0, 0, -40});
     instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-    instanceBufferDesc.ByteWidth =
-        sizeof(INSTANCES_POSITION_BUFFER) * willows.instance_count;
     instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     instanceBufferDesc.CPUAccessFlags = 0;
     instanceBufferDesc.MiscFlags = 0;
+    // Make willows data
+    willows_instances.push_back({0, 0, 40});
+    willows_instances.push_back({-5, 0, 10});
+    willows.instance_count = willows_instances.size();
+    instanceBufferDesc.ByteWidth =
+        sizeof(INSTANCES_POSITION_BUFFER) * willows.instance_count;
     instanceData.pSysMem = &willows_instances[0];
+    // Make instance buffer
     creator->CreateBuffer(&instanceBufferDesc, &instanceData,
                           &willows.instanceBuffer);
 
@@ -239,7 +278,7 @@ class Renderer {
     CD3D11_BUFFER_DESC cDesc(sizeof(shaderVars), D3D11_BIND_CONSTANT_BUFFER);
     creator->CreateBuffer(&cDesc, &cData, constantBuffer.GetAddressOf());
 
-    // Create Vertex Shader
+    // Create Vertex Shaders
     UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if _DEBUG
     compilerFlags |= D3DCOMPILE_DEBUG;
@@ -254,6 +293,17 @@ class Renderer {
                                   vertexShader.GetAddressOf());
     } else
       std::cout << (char*)errors->GetBufferPointer() << std::endl;
+
+    if (SUCCEEDED(D3DCompile(
+            instancedVertexShaderSource, strlen(instancedVertexShaderSource),
+            nullptr, nullptr, nullptr, "main", "vs_4_0", compilerFlags, 0,
+            vsBlob.GetAddressOf(), errors.GetAddressOf()))) {
+      creator->CreateVertexShader(vsBlob->GetBufferPointer(),
+                                  vsBlob->GetBufferSize(), nullptr,
+                                  instancedVertexShader.GetAddressOf());
+    } else
+      std::cout << (char*)errors->GetBufferPointer() << std::endl;
+
     // Create Pixel Shader
     Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
     errors.Reset();
@@ -317,16 +367,16 @@ class Renderer {
                 willow_meshes[3].indexOffset);
     DrawObjMesh(willow, willow_meshes[2].indexCount,
                 willow_meshes[2].indexOffset);*/
-    // DrawObjMesh(willows.obj_mesh, willow_indexcount, 0);
 
     // Set texture
     ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
     con->PSSetShaderResources(0, 1, srvs);
 
     // Instanced draw
+    con->VSSetShader(instancedVertexShader.Get(), nullptr, 0);
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    const UINT strides[] = {sizeof(OBJ_VERT)};
-    const UINT offsets[] = {0};
+    const UINT strides[2] = {sizeof(OBJ_VERT), sizeof(float) * 3};
+    const UINT offsets[2] = {0, 0};
 
     ID3D11Buffer* willow_instance_buffers[2] = {
         willows.obj_mesh.vertexBuffer.Get(), willows.instanceBuffer.Get()};
