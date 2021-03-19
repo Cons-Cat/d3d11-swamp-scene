@@ -1,5 +1,6 @@
 // minimalistic code to draw a single triangle, this is not part of the API.
 // required for compiling shaders on the fly, consider pre-compiling instead
+#include <d3d11_1.h>
 #include <d3dcompiler.h>
 
 #include "DDSTextureLoader.h"
@@ -40,13 +41,20 @@ Texture2D in_tex;
 SamplerState sam;
 
 float4 main(float2 uv : TEXTURE,
-            float3 nrm : NORMAL) : SV_TARGET 
+            float3 nrm : NORMAL) : SV_Target0 
 {
    float4 color = in_tex.Sample(sam, uv);
    float3 lightDir = { -1, -1, 1 };
    lightDir = normalize(lightDir);
    float lightR = dot(-lightDir, normalize(nrm));
-	return color * lightR;
+	color = color * lightR;
+   //return float4(0, 0, 0, 0.5f);
+   if (color.a == 0) {
+      return float4(0, 0, 0, 0.0f);
+   } else {
+      color.a = 1;
+      return color;
+   }
 }
 )";
 
@@ -60,6 +68,7 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
+  ID3D11BlendState* blendState;
 
   // Loading models
   struct OBJ_MESH {
@@ -137,8 +146,8 @@ class Renderer {
 
   void Update() {
     // Update a mesh
-    // m.TranslatelocalF(cat_pyramid.world, {0, 0, 1}, cat_pyramid.world);
     m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
+    // Update camera
   }
 
   Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX11Surface _d3d) {
@@ -159,6 +168,24 @@ class Renderer {
     ID3D11Device* creator;
     d3d.GetDevice((void**)&creator);
 
+    D3D11_BLEND_DESC blendStateDesc;
+    ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
+    blendStateDesc.AlphaToCoverageEnable = FALSE;
+    blendStateDesc.IndependentBlendEnable = FALSE;
+    blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
+    blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    blendStateDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    blendStateDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_SRC_ALPHA;
+    blendStateDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_DEST_ALPHA;
+    blendStateDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    blendStateDesc.RenderTarget[0].RenderTargetWriteMask =
+        D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    if (FAILED(creator->CreateBlendState(&blendStateDesc, &blendState))) {
+      printf("Failed To Create Blend State\n");
+    }
+
     // Load the pyramid
     cat_pyramid = LoadObjMesh(test_pyramid_data, test_pyramid_vertexcount,
                               test_pyramid_indicies, test_pyramid_indexcount,
@@ -166,6 +193,8 @@ class Renderer {
 
     willow = LoadObjMesh(willow_data, willow_vertexcount, willow_indicies,
                          willow_indexcount, L"../asset/treeWillow_Trunk_D.dds");
+    m.TranslatelocalF(willow.world, GW::MATH::GVECTORF{0, 0, 10.0f},
+                      willow.world);
     m.ScalingF(willow.world, GW::MATH::GVECTORF{0.1f, 0.1f, 0.1f},
                willow.world);
 
@@ -230,6 +259,7 @@ class Renderer {
     // setup the pipeline
     ID3D11RenderTargetView* const views[] = {view};
     con->OMSetRenderTargets(ARRAYSIZE(views), views, depth);
+    con->OMSetBlendState(blendState, 0, 0xFFFFFF);
 
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
