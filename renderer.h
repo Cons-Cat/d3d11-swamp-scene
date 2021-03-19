@@ -6,6 +6,7 @@
 #include "DDSTextureLoader.h"
 #include "asset/test_pyramid.h"
 #include "asset/willow.h"
+#include "skybox.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 

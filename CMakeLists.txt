@@ -31,7 +31,7 @@ add_executable (GreenScreen
 	struct_of_arrays.cpp
 	asset/test_pyramid.h
 	asset/willow.h
-	#asset/my_face.dds
+	skybox.h
 	DDSTextureLoader.h
 	DDSTextureLoader.cpp
 	${VERTEX_SHADERS}
