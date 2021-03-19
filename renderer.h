@@ -44,15 +44,16 @@ float4 main(float2 uv : TEXTURE,
             float3 nrm : NORMAL) : SV_TARGET
 {
    float4 color = in_tex.Sample(sam, uv);
-   float3 lightDir = { -1, -1, 1 };
-   lightDir = normalize(lightDir);
-   float lightR = dot(-lightDir, normalize(nrm));
-	color = color * lightR;
    if (color.a == 0) {
       discard;
       return 0;
    } else {
-      color.a = color.a * 2;
+      float3 lightDir = { -1, -1, 1 };
+      lightDir = normalize(lightDir);
+      float lightR = dot(-lightDir, normalize(nrm));
+      float temp_alpha = color.a;
+	   color = color * lightR;
+      color.a = temp_alpha;
       return color;
    }
 }
@@ -121,7 +122,8 @@ class Renderer {
     return outModel;
   }
 
-  void DrawObjMesh(const OBJ_MESH& drawMe) {
+  void DrawObjMesh(const OBJ_MESH& drawMe, size_t index_count,
+                   size_t index_offset) {
     ID3D11DeviceContext* con;
     d3d.GetImmediateContext((void**)&con);
     // Update world matrix
@@ -139,7 +141,7 @@ class Renderer {
     con->PSSetShaderResources(0, 1, srvs);
     // now we can draw
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    con->DrawIndexed(drawMe.index_count, 0, 0);
+    con->DrawIndexed(index_count, index_offset, 0);
     // Release reference count
     con->Release();
   }
@@ -147,6 +149,7 @@ class Renderer {
   void Update() {
     // Update a mesh
     m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
+    m.RotationYF(willow.world, 0.01f, willow.world);
     // Update camera
   }
 
@@ -170,8 +173,8 @@ class Renderer {
 
     D3D11_BLEND_DESC blendStateDesc;
     ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
-    // blendStateDesc.AlphaToCoverageEnable = FALSE;
-    // blendStateDesc.IndependentBlendEnable = FALSE;
+    blendStateDesc.AlphaToCoverageEnable = TRUE;
+    blendStateDesc.IndependentBlendEnable = TRUE;
     blendStateDesc.RenderTarget[0].BlendEnable = TRUE;
     blendStateDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
     blendStateDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
@@ -268,7 +271,13 @@ class Renderer {
 
     // move pyramid
     // DrawObjMesh(cat_pyramid);
-    DrawObjMesh(willow);
+    /*DrawObjMesh(willow, willow_meshes[4].indexCount,
+                willow_meshes[4].indexOffset);
+    DrawObjMesh(willow, willow_meshes[3].indexCount,
+                willow_meshes[3].indexOffset);
+    DrawObjMesh(willow, willow_meshes[2].indexCount,
+                willow_meshes[2].indexOffset);*/
+    DrawObjMesh(willow, willow_indexcount, 0);
 
     // release temp handles
     view->Release();
