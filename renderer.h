@@ -200,26 +200,37 @@ class Renderer {
   }
 
   void Update() {
+    // Update a mesh
+    // m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
+
+    // Look camera
+    m.InverseF(shaderVars.v, shaderVars.v);
+    auto camera_pos = shaderVars.v.row4;
+    m.InverseF(shaderVars.v, shaderVars.v);
+    shaderVars.v.row4 = GW::MATH::GZeroVectorF;
+    shaderVars.v.row4.w = 1;
+    m.InverseF(shaderVars.v, INPUTTER::camera);
+    INPUTTER::look_camera();
+    shaderVars.v = INPUTTER::camera;
+    m.InverseF(shaderVars.v, shaderVars.v);
+    shaderVars.v.row4 = camera_pos;
+    m.InverseF(shaderVars.v, shaderVars.v);
+
+    // Walk camera
 #define EVAL_INPUT(DIR)                               \
   float o_##DIR## = 0;                                \
   INPUTTER::input.GetState(G_KEY_##DIR##, o_##DIR##); \
   float is_##DIR## = (o_##DIR## == 0 ? 0 : 1.0f);
 
-    // Update a mesh
-    // m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
-    // Update camera
     EVAL_INPUT(UP);
     EVAL_INPUT(DOWN);
     EVAL_INPUT(LEFT);
     EVAL_INPUT(RIGHT);
     float z = INPUTTER::walk_speed * (is_UP - is_DOWN);
     float x = INPUTTER::walk_speed * (is_RIGHT - is_LEFT);
-
     m.InverseF(shaderVars.v, INPUTTER::camera);
-
     m.TranslatelocalF(INPUTTER::camera, GW::MATH::GVECTORF{x, 0, z},
                       INPUTTER::camera);
-
     m.InverseF(INPUTTER::camera, shaderVars.v);
   }
 
