@@ -136,7 +136,7 @@ float4 main(float2 uv : TEXTURE,
 #pragma region
 
 const char* skyPixelShaderSource = R"(
-// #pragma target 4.0
+#pragma target 4.0
 
 TextureCube in_tex;
 SamplerState sam;
@@ -235,30 +235,6 @@ class Renderer {
     creator->Release();
     return outModel;
   }
-
-  /*OBJ_MESH LoadSkybox(const OBJ_VERT* verts, unsigned num_verts,
-                      const unsigned* indicies, unsigned num_index) {
-    // Get device for loading
-    ID3D11Device* creator;
-    d3d.GetDevice((void**)&creator);
-    // Initialize model
-    OBJ_MESH outModel;
-    outModel.world = GW::MATH::GIdentityMatrixF;
-    outModel.index_count = num_index;
-    // Create Vertex Buffer
-    D3D11_SUBRESOURCE_DATA bData = {verts, 0, 0};
-    CD3D11_BUFFER_DESC bDesc(sizeof(OBJ_VERT) * num_verts,
-                             D3D11_BIND_VERTEX_BUFFER);
-    creator->CreateBuffer(&bDesc, &bData, outModel.vertexBuffer.GetAddressOf());
-    // Create Index Buffer
-    D3D11_SUBRESOURCE_DATA iData = {indicies, 0, 0};
-    CD3D11_BUFFER_DESC iDesc(sizeof(unsigned) * num_index,
-                             D3D11_BIND_INDEX_BUFFER);
-    creator->CreateBuffer(&iDesc, &iData, outModel.indexBuffer.GetAddressOf());
-    // Free
-    creator->Release();
-    return outModel;
-  }*/
 
   void DrawObjMesh(const OBJ_MESH& drawMe, size_t index_count,
                    size_t index_offset) {
@@ -364,14 +340,14 @@ class Renderer {
     }
 
     // Load the skybox
-    CreateDDSTextureFromFile(
+    /*CreateDDSTextureFromFile(
         creator, L"../asset/skybox.dds",
         (ID3D11Resource**)environmentTexture.GetAddressOf(),
-        environmentView.GetAddressOf());
+        environmentView.GetAddressOf());*/
     inverse_box = LoadObjMesh(inverse_box_data, inverse_box_vertexcount,
                               inverse_box_indicies, inverse_box_indexcount,
-                              L"../asset/my_face.dds");
-    inverse_box.diffuse = environmentView;
+                              L"../asset/skybox.dds");
+    // inverse_box.diffuse = environmentView;
     m.ScalingF(inverse_box.world,
                GW::MATH::GVECTORF{far_plane, far_plane, far_plane, 1},
                inverse_box.world);
@@ -488,8 +464,8 @@ class Renderer {
     // Skybox
     con->VSSetShader(skyVertexShader.Get(), nullptr, 0);
     con->PSSetShader(skyPixelShader.Get(), nullptr, 0);
-    ID3D11ShaderResourceView* const sky_tex[] = {environmentView.Get()};
-    con->PSSetShaderResources(0, 1, sky_tex);
+    /*ID3D11ShaderResourceView* const sky_tex[] = {environmentView.Get()};
+    con->PSSetShaderResources(0, 1, sky_tex);*/
     DrawObjMesh(inverse_box, inverse_box_indexcount, 0);
 
     // Meshes
