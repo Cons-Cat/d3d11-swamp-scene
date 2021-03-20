@@ -5,5 +5,8 @@ cmake-build-debug/
 *.zip
 *.obj
 *.jpg
+*.png
+*.ma
+*.mtl
 shader/pixl_simple.h
 shader/vert_simple.h

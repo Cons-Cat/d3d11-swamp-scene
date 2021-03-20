@@ -4,9 +4,9 @@
 #include <d3dcompiler.h>
 
 #include "DDSTextureLoader.h"
+#include "asset/inverse_box.h"
 #include "asset/test_pyramid.h"
 #include "asset/willow.h"
-#include "skybox.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
 
