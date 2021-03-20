@@ -11,6 +11,7 @@
 #pragma comment(lib, "d3dcompiler.lib")
 
 // Simple Vertex Shader
+#pragma region
 const char* vertexShaderSource = R"(
 #pragma pack_matrix(row_major)
 cbuffer IntoGpu {
@@ -36,8 +37,39 @@ OUT_VERT main(float3 inputVertex : POSITION,
    return output;
 }
 )";
+#pragma endregion
+
+// Skybox Vertex Shader
+#pragma region
+const char* skyVertexShaderSource = R"(
+#pragma pack_matrix(row_major)
+cbuffer IntoGpu {
+   matrix w, v, p;
+};
+
+struct OUT_VERT
+{
+   float2 uv : TEXTURE;
+   float3 nrm : NORMAL;
+   float4 pos : SV_POSITION;
+};
+
+OUT_VERT main(float3 inputVertex : POSITION,
+              float3 texCoord : UVW,
+              float3 normal : NORMAL)
+{
+   OUT_VERT output;
+	output.pos = float4(inputVertex, 1);
+   output.pos = mul(mul(mul(output.pos, w),v),p);
+   output.uv = texCoord.xy;
+   output.nrm = mul(normal, w);
+   return output;
+}
+)";
+#pragma endregion
 
 // Simple Instanced Vertex Shader
+#pragma region
 const char* instancedVertexShaderSource = R"(
 #pragma pack_matrix(row_major)
 cbuffer IntoGpu {
@@ -71,14 +103,17 @@ OUT_VERT main(float3 inputVertex : POSITION,
    return output;
 }
 )";
+#pragma endregion
 
 // Simple Pixel Shader
+#pragma region
 const char* pixelShaderSource = R"(
 Texture2D in_tex;
 SamplerState sam;
 
 float4 main(float2 uv : TEXTURE,
-            float3 nrm : NORMAL) : SV_TARGET
+            float3 nrm : NORMAL
+) : SV_TARGET
 {
    float4 color = in_tex.Sample(sam, uv);
    if (color.a == 0) {
@@ -95,6 +130,27 @@ float4 main(float2 uv : TEXTURE,
    }
 }
 )";
+#pragma endregion
+
+// Skybox Pixel Shader
+#pragma region
+
+const char* skyPixelShaderSource = R"(
+// #pragma target 4.0
+
+TextureCube in_tex;
+SamplerState sam;
+
+float4 main(float2 uv : TEXTURE,
+            float3 nrm : NORMAL,
+            float4 pos : SV_POSITION
+) : SV_TARGET
+{
+   float4 color = in_tex.Sample(sam, pos.xyz);
+   return color;
+}
+)";
+#pragma endregion
 
 // Creation, Rendering & Cleanup
 class Renderer {
@@ -105,9 +161,17 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> instancedVertexShader;
+  Microsoft::WRL::ComPtr<ID3D11VertexShader> skyVertexShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
+  Microsoft::WRL::ComPtr<ID3D11PixelShader> skyPixelShader;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
   ID3D11BlendState* blendState;
+
+  // Skybox
+  Microsoft::WRL::ComPtr<ID3D11Texture2D> environmentTexture;
+  Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> environmentView;
+  float near_plane = 0.1f;
+  float far_plane = 1000.0f;
 
   // Loading models
   struct OBJ_MESH {
@@ -139,6 +203,7 @@ class Renderer {
 
   // Make objects for models here.
   OBJ_MESH cat_pyramid;
+  OBJ_MESH inverse_box;
   INSTANCED_MESH willows;
   std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
 
@@ -170,6 +235,30 @@ class Renderer {
     creator->Release();
     return outModel;
   }
+
+  /*OBJ_MESH LoadSkybox(const OBJ_VERT* verts, unsigned num_verts,
+                      const unsigned* indicies, unsigned num_index) {
+    // Get device for loading
+    ID3D11Device* creator;
+    d3d.GetDevice((void**)&creator);
+    // Initialize model
+    OBJ_MESH outModel;
+    outModel.world = GW::MATH::GIdentityMatrixF;
+    outModel.index_count = num_index;
+    // Create Vertex Buffer
+    D3D11_SUBRESOURCE_DATA bData = {verts, 0, 0};
+    CD3D11_BUFFER_DESC bDesc(sizeof(OBJ_VERT) * num_verts,
+                             D3D11_BIND_VERTEX_BUFFER);
+    creator->CreateBuffer(&bDesc, &bData, outModel.vertexBuffer.GetAddressOf());
+    // Create Index Buffer
+    D3D11_SUBRESOURCE_DATA iData = {indicies, 0, 0};
+    CD3D11_BUFFER_DESC iDesc(sizeof(unsigned) * num_index,
+                             D3D11_BIND_INDEX_BUFFER);
+    creator->CreateBuffer(&iDesc, &iData, outModel.indexBuffer.GetAddressOf());
+    // Free
+    creator->Release();
+    return outModel;
+  }*/
 
   void DrawObjMesh(const OBJ_MESH& drawMe, size_t index_count,
                    size_t index_offset) {
@@ -248,7 +337,7 @@ class Renderer {
     // Camera
     float ar;
     d3d.GetAspectRatio(ar);
-    m.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN(70), ar, 0.1f, 1000,
+    m.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN(70), ar, near_plane, far_plane,
                            shaderVars.p);
     INPUTTER::init_camera(ar, win);
 
@@ -273,6 +362,19 @@ class Renderer {
     if (FAILED(creator->CreateBlendState(&blendStateDesc, &blendState))) {
       printf("Failed To Create Blend State\n");
     }
+
+    // Load the skybox
+    CreateDDSTextureFromFile(
+        creator, L"../asset/skybox.dds",
+        (ID3D11Resource**)environmentTexture.GetAddressOf(),
+        environmentView.GetAddressOf());
+    inverse_box = LoadObjMesh(inverse_box_data, inverse_box_vertexcount,
+                              inverse_box_indicies, inverse_box_indexcount,
+                              L"../asset/my_face.dds");
+    inverse_box.diffuse = environmentView;
+    m.ScalingF(inverse_box.world,
+               GW::MATH::GVECTORF{far_plane, far_plane, far_plane, 1},
+               inverse_box.world);
 
     // Load the pyramid
     cat_pyramid = LoadObjMesh(test_pyramid_data, test_pyramid_vertexcount,
@@ -312,44 +414,38 @@ class Renderer {
     CD3D11_BUFFER_DESC cDesc(sizeof(shaderVars), D3D11_BIND_CONSTANT_BUFFER);
     creator->CreateBuffer(&cDesc, &cData, constantBuffer.GetAddressOf());
 
-    // Create Vertex Shaders
     UINT compilerFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #if _DEBUG
     compilerFlags |= D3DCOMPILE_DEBUG;
 #endif
-    Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, errors;
-    if (SUCCEEDED(D3DCompile(vertexShaderSource, strlen(vertexShaderSource),
-                             nullptr, nullptr, nullptr, "main", "vs_4_0",
-                             compilerFlags, 0, vsBlob.GetAddressOf(),
-                             errors.GetAddressOf()))) {
-      creator->CreateVertexShader(vsBlob->GetBufferPointer(),
-                                  vsBlob->GetBufferSize(), nullptr,
-                                  vertexShader.GetAddressOf());
-    } else
-      std::cout << (char*)errors->GetBufferPointer() << std::endl;
+    Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, psBlob, errors;
 
-    if (SUCCEEDED(D3DCompile(
-            instancedVertexShaderSource, strlen(instancedVertexShaderSource),
-            nullptr, nullptr, nullptr, "main", "vs_4_0", compilerFlags, 0,
-            vsBlob.GetAddressOf(), errors.GetAddressOf()))) {
-      creator->CreateVertexShader(vsBlob->GetBufferPointer(),
-                                  vsBlob->GetBufferSize(), nullptr,
-                                  instancedVertexShader.GetAddressOf());
-    } else
-      std::cout << (char*)errors->GetBufferPointer() << std::endl;
+    // Create Vertex Shaders
+#define LoadVertShader(shdname)                                              \
+  D3DCompile(##shdname##Source, strlen(##shdname##Source), nullptr, nullptr, \
+             nullptr, "main", "vs_4_0", compilerFlags, 0,                    \
+             vsBlob.GetAddressOf(), errors.GetAddressOf());                  \
+  creator->CreateVertexShader(vsBlob->GetBufferPointer(),                    \
+                              vsBlob->GetBufferSize(), nullptr,              \
+                              ##shdname##.GetAddressOf());                   \
+  errors.Reset();
 
-    // Create Pixel Shader
-    Microsoft::WRL::ComPtr<ID3DBlob> psBlob;
-    errors.Reset();
-    if (SUCCEEDED(D3DCompile(pixelShaderSource, strlen(pixelShaderSource),
-                             nullptr, nullptr, nullptr, "main", "ps_4_0",
-                             compilerFlags, 0, psBlob.GetAddressOf(),
-                             errors.GetAddressOf()))) {
-      creator->CreatePixelShader(psBlob->GetBufferPointer(),
-                                 psBlob->GetBufferSize(), nullptr,
-                                 pixelShader.GetAddressOf());
-    } else
-      std::cout << (char*)errors->GetBufferPointer() << std::endl;
+    LoadVertShader(vertexShader);
+    LoadVertShader(skyVertexShader);
+    LoadVertShader(instancedVertexShader);
+
+    // Create Pixel Shaders
+#define LoadPixShader(shdname)                                               \
+  D3DCompile(##shdname##Source, strlen(##shdname##Source), nullptr, nullptr, \
+             nullptr, "main", "ps_4_0", compilerFlags, 0,                    \
+             psBlob.GetAddressOf(), errors.GetAddressOf());                  \
+  creator->CreatePixelShader(psBlob->GetBufferPointer(),                     \
+                             psBlob->GetBufferSize(), nullptr,               \
+                             ##shdname##.GetAddressOf());                    \
+  errors.Reset();
+
+    LoadPixShader(pixelShader);
+    LoadPixShader(skyPixelShader);
 
     // Create Input Layout
     D3D11_INPUT_ELEMENT_DESC format[] = {
@@ -387,15 +483,23 @@ class Renderer {
     ID3D11RenderTargetView* const views[] = {view};
     con->OMSetRenderTargets(ARRAYSIZE(views), views, depth);
     con->OMSetBlendState(blendState, 0, 0xFFFFFF);
+    con->IASetInputLayout(vertexFormat.Get());
 
+    // Skybox
+    con->VSSetShader(skyVertexShader.Get(), nullptr, 0);
+    con->PSSetShader(skyPixelShader.Get(), nullptr, 0);
+    ID3D11ShaderResourceView* const sky_tex[] = {environmentView.Get()};
+    con->PSSetShaderResources(0, 1, sky_tex);
+    DrawObjMesh(inverse_box, inverse_box_indexcount, 0);
+
+    // Meshes
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
-    con->IASetInputLayout(vertexFormat.Get());
 
-    // move pyramid
     DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
 
+    // TODO: Abstract instanced mesh function.
     // Set texture
     ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
     con->PSSetShaderResources(0, 1, srvs);
@@ -419,6 +523,7 @@ class Renderer {
     depth->Release();
     con->Release();
   }
+
   ~Renderer() {
     // ComPtr will auto release so nothing to do here
   }
