@@ -246,14 +246,15 @@ class Renderer {
     d3d.GetDevice((void**)&creator);
 
     // Camera
-    float ar = 1;
+    float ar;
     d3d.GetAspectRatio(ar);
     m.ProjectionDirectXLHF(G_DEGREE_TO_RADIAN(70), ar, 0.1f, 1000,
                            shaderVars.p);
     INPUTTER::init_camera(ar, win);
 
-    m.LookAtLHF(GW::MATH::GVECTORF{1, 1, -2}, GW::MATH::GVECTORF{0, 1, 0},
+    m.LookAtLHF(GW::MATH::GVECTORF{1, 1, -2}, GW::MATH::GVECTORF{0, 1, 1},
                 GW::MATH::GVECTORF{0, 1, 0}, shaderVars.v);
+    m.RotationYawPitchRollF(0, 0, 3.14f, shaderVars.v);
 
     D3D11_BLEND_DESC blendStateDesc;
     ZeroMemory(&blendStateDesc, sizeof(D3D11_BLEND_DESC));
