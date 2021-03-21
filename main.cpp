@@ -42,17 +42,15 @@ int main() {
         ID3D11DeviceContext* con;
         ID3D11RenderTargetView* view;
         ID3D11DepthStencilView* depth;
-        // Mutate universe state.
-        // INPUTTER::walk_camera();
-        // INPUTTER::look_camera();
         if (+d3d11.GetImmediateContext((void**)&con) &&
             +d3d11.GetRenderTargetView((void**)&view) &&
             +d3d11.GetSwapchain((void**)&swap) &&
             +d3d11.GetDepthStencilView((void**)&depth)) {
           con->ClearRenderTargetView(view, clr);
           con->ClearDepthStencilView(depth, D3D11_CLEAR_DEPTH, 1, 0);
-          // Send to GPU.
+          // Update mutable state.
           renderer.Update();
+          // Send to GPU.
           renderer.Render();
           swap->Present(1, 0);
           // release incremented COM reference counts
