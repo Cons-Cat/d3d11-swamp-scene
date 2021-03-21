@@ -157,9 +157,10 @@ float4 main(float2 uv : TEXTURE,
 // Grass Shader
 #pragma region
 const char* grassPixelShaderSource = R"(
-SamplerState sam;
+//SamplerState sam;
 
-float4 main(float4 clr : COLOR,
+float4 main(
+            float4 clr : COLOR,
             float4 pos : SV_POSITION
 ) : SV_TARGET
 {
@@ -209,27 +210,29 @@ struct GRASS_VERT
 [maxvertexcount(3)]
 void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
 {
-   /*
-   float half_bh = theScene.blade_height * 0.5;
+   // float half_bh = theScene.blade_height * 0.5;
+   float blade_height = 6;
+   float half_bh = blade_height * 0.5;
+   
    GSOutput simple[3];
 
-   simple[0].clr = float4(0.1f,0.6f,0.1f,1);
-   simple[1].clr = float4(0,1,0,1);
+   simple[0].clr = float4(0.1f, 0.6f, 0.1f, 1);
+   simple[1].clr = float4(0, 1, 0, 1);
    simple[2].clr = simple[0].clr;
    
-   simple[0].posH = float4[input[0].posW_s.xyz,1);
+   simple[0].posH = float4(input[0].posW_s.xyz, 1);
    simple[1].posH = simple[0].posH;
    simple[2].posH = simple[0].posH;
 
    simple[0].posH.x -= half_bh;
-   simple[1].posH.y += theScene.blade_height;
+   simple[1].posH.y += blade_height;
    simple[2].posH.x += half_bh;
 
    for (uint i = 0; i < 3; ++i) {
-      simple[i].posH = mul(simple[i].posH, theScene.ViewProjection);
+      //simple[i].posH = mul(simple[i].posH, theScene.ViewProjection);
+      //simple[i].posH = mul(simple[i].posH, 1);
       output.Append(simple[i]);
    }
-   */
 }
 )";
 #pragma endregion
@@ -259,6 +262,7 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11GeometryShader> grassGeoShader;
   Microsoft::WRL::ComPtr<ID3D11Buffer> grassPositions;
   Microsoft::WRL::ComPtr<ID3D11Buffer> grassDirections;
+  Microsoft::WRL::ComPtr<ID3D11InputLayout> grassVertexFormat;
   ID3D11BlendState* blendState;
 
   // Skybox
@@ -288,9 +292,6 @@ class Renderer {
     float position[3];
   };
 
-  std::vector<float[4]> grass_positions;
-  std::vector<float[4]> grass_directions;
-
   // Math
   GW::MATH::GMatrix m;
   struct IntoGpu {
@@ -307,6 +308,23 @@ class Renderer {
   // Geometry shader
   const unsigned int grass_count = 10;
   float blade_height = 10.0f;
+
+  struct GRASS_POS {
+    float x;
+    float y;
+    float z;
+    float w = 1;
+  };
+
+  struct GRASS_DIR {
+    float x;
+    float y;
+    float z;
+    float w = 1;
+  };
+
+  std::vector<GRASS_POS> grass_positions;
+  std::vector<GRASS_DIR> grass_directions;
 
  public:
   OBJ_MESH LoadObjMesh(const OBJ_VERT* verts, unsigned num_verts,
@@ -441,14 +459,9 @@ class Renderer {
     }
 
     // Load the skybox
-    /*CreateDDSTextureFromFile(
-        creator, L"../asset/skybox.dds",
-        (ID3D11Resource**)environmentTexture.GetAddressOf(),
-        environmentView.GetAddressOf());*/
     inverse_box = LoadObjMesh(inverse_box_data, inverse_box_vertexcount,
                               inverse_box_indicies, inverse_box_indexcount,
                               L"../asset/skybox.dds");
-    // inverse_box.diffuse = environmentView;
     m.ScalingF(inverse_box.world,
                GW::MATH::GVECTORF{far_plane, far_plane, far_plane, 1},
                inverse_box.world);
@@ -489,18 +502,17 @@ class Renderer {
     // Create grass
     D3D11_SUBRESOURCE_DATA grassInstanceDataPos;
     D3D11_SUBRESOURCE_DATA grassInstanceDataDir;
-    float temp_grass[4] = {2, 2, 2, 1};
-    grass_positions.push_back(temp_grass);
-    temp_grass[0] = 0;
-    temp_grass[1] = 0;
-    temp_grass[2] = 0;
-    grass_directions.push_back(temp_grass);
 
-    instanceBufferDesc.ByteWidth = sizeof(float[4]) * grass_positions.size();
-    instanceData.pSysMem = &grass_positions[0];
+    grass_positions.push_back({2, 2, 2});
+    grass_directions.push_back({0, 1, 0});
+
+    instanceBufferDesc.ByteWidth = sizeof(GRASS_POS) * grass_positions.size();
+
+    grassInstanceDataPos.pSysMem = &grass_positions[0];
     creator->CreateBuffer(&instanceBufferDesc, &grassInstanceDataPos,
                           grassPositions.GetAddressOf());
-    instanceData.pSysMem = &grass_directions[0];
+
+    grassInstanceDataDir.pSysMem = &grass_directions[0];
     creator->CreateBuffer(&instanceBufferDesc, &grassInstanceDataDir,
                           grassDirections.GetAddressOf());
 
@@ -526,10 +538,12 @@ class Renderer {
                               ##shdname##.GetAddressOf());                   \
   errors.Reset();
 
+    /*
     LoadVertShader(vertexShader);
     LoadVertShader(skyVertexShader);
-    LoadVertShader(grassVertexShader);
     LoadVertShader(instancedVertexShader);
+    */
+    LoadVertShader(grassVertexShader);
 
     // Create Pixel Shaders
 #define LoadPixShader(shdname)                                               \
@@ -541,8 +555,10 @@ class Renderer {
                              ##shdname##.GetAddressOf());                    \
   errors.Reset();
 
+    /*
     LoadPixShader(pixelShader);
     LoadPixShader(skyPixelShader);
+    */
     LoadPixShader(grassPixelShader);
 
     // Create Geometry Shaders
@@ -558,6 +574,7 @@ class Renderer {
     LoadGeoShader(grassGeoShader);
 
     // Create Input Layout
+    /*
     D3D11_INPUT_ELEMENT_DESC format[] = {
         // Vertex buffer
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
@@ -575,6 +592,21 @@ class Renderer {
     creator->CreateInputLayout(
         format, ARRAYSIZE(format), vsBlob->GetBufferPointer(),
         vsBlob->GetBufferSize(), vertexFormat.GetAddressOf());
+    */
+
+    D3D11_INPUT_ELEMENT_DESC grass_format[] = {
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
+         D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
+         D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+    };
+
+    if (creator->CreateInputLayout(grass_format, ARRAYSIZE(grass_format),
+                                   vsBlob->GetBufferPointer(),
+                                   vsBlob->GetBufferSize(),
+                                   grassVertexFormat.GetAddressOf()) != S_OK) {
+      int a = 0;
+    }
 
     // free temporary handle
     creator->Release();
@@ -593,23 +625,29 @@ class Renderer {
     ID3D11RenderTargetView* const views[] = {view};
     con->OMSetRenderTargets(ARRAYSIZE(views), views, depth);
     con->OMSetBlendState(blendState, 0, 0xFFFFFF);
+
+    /*
     con->IASetInputLayout(vertexFormat.Get());
 
     // Skybox
     con->VSSetShader(skyVertexShader.Get(), nullptr, 0);
     con->PSSetShader(skyPixelShader.Get(), nullptr, 0);
-    /*ID3D11ShaderResourceView* const sky_tex[] = {environmentView.Get()};
-    con->PSSetShaderResources(0, 1, sky_tex);*/
+    //ID3D11ShaderResourceView* const sky_tex[] = {environmentView.Get()};
+    //con->PSSetShaderResources(0, 1, sky_tex);
     DrawObjMesh(inverse_box, inverse_box_indexcount, 0);
+    */
 
+    /*
     // Meshes
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
 
     DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
+    */
 
     // TODO: Abstract instanced mesh function.
+    /*
     // Set texture
     ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
     con->PSSetShaderResources(0, 1, srvs);
@@ -627,14 +665,18 @@ class Renderer {
     con->IASetVertexBuffers(0, 2, willow_instance_buffers, strides, offsets);
     con->DrawIndexedInstanced(willow_indexcount, willows.instance_count, 0, 0,
                               0);
-
+                              */
     // Grass geometry
     const unsigned int grass_offsets[] = {0, 0};
     const unsigned int grass_strides[] = {sizeof(float) * 4, sizeof(float) * 4};
 
     ID3D11Buffer* const buffs[] = {grassPositions.Get(), grassDirections.Get()};
 
-    con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, strides, offsets);
+    con->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+    con->IASetInputLayout(grassVertexFormat.Get());
+    con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, grass_strides,
+                            grass_offsets);
+
     con->VSSetShader(grassVertexShader.Get(), 0, 0);
     con->GSSetShader(grassGeoShader.Get(), 0, 0);
     con->PSSetShader(grassPixelShader.Get(), 0, 0);
@@ -646,11 +688,11 @@ class Renderer {
     ID3D11RasterizerState* grass_rs;
     creator->CreateRasterizerState(grass_desc, &grass_rs);
     con->RSSetState(grass_rs);
-    delete grass_desc;
 
     // con->Draw(grass_count, 0);
     con->Draw(1, 0);
 
+    delete grass_desc;
     // release temp handles
     view->Release();
     depth->Release();
