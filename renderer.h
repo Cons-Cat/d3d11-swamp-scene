@@ -160,6 +160,45 @@ float4 main(float2 uv : TEXTURE,
 )";
 #pragma endregion
 
+// Normal Shader
+#pragma region
+const char* normalPixelShaderSource = R"(
+Texture2D in_tex;
+Texture2D in_norm;
+SamplerState sam;
+
+float4 main(float2 uv : TEXTURE,
+            float3 nrm : NORMAL
+) : SV_TARGET
+{
+	float4 color = in_tex.Sample(sam, uv);
+	float4 pxnrm = in_norm.Sample(sam, uv);
+	if (color.a == 0)
+	{
+		discard;
+		return 0;
+	}
+	else
+	{
+		float temp_alpha = color.a;
+		float3 lightDir = { -1, -1, 1 };
+		lightDir = normalize(lightDir);
+      
+      float3 normalT = 2 * pxnrm - 1;
+      float3 n = (nrm);
+      float3 t = -normalize(tan(nrm) - dot(tan(nrm),n) * n);
+      float3 b = cross(n, t);
+      float3x3 tbn = float3x3(t,b,n);
+      float3 nrm = mul(normalT, tbn);
+		float lightR = dot(-lightDir, normalize(nrm));
+		color = color * (lightR + color.a) / 2;
+		color.a = temp_alpha;
+		return color;
+	}
+}
+)";
+#pragma endregion
+
 // Grass Shader
 #pragma region
 const char* grassPixelShaderSource = R"(
@@ -273,6 +312,7 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11Buffer> grassPositions;
   Microsoft::WRL::ComPtr<ID3D11Buffer> grassDirections;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> grassVertexFormat;
+  Microsoft::WRL::ComPtr<ID3D11PixelShader> normalPixelShader;
   ID3D11BlendState* blendState;
 
   // Skybox
@@ -290,6 +330,17 @@ class Renderer {
     Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
     Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
     Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> diffuse;
+  };
+
+  struct NORM_MESH {
+    // Drawing data
+    unsigned int index_count;
+    GW::MATH::GMATRIXF world;
+    // Loading data
+    Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> indexBuffer;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> diffuse;
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> normal;
   };
 
   struct INSTANCED_MESH {
@@ -312,7 +363,7 @@ class Renderer {
   // Make objects for models here.
   OBJ_MESH cat_pyramid;
   OBJ_MESH inverse_box;
-  OBJ_MESH fountain;
+  NORM_MESH fountain;
   INSTANCED_MESH willows;
   std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
 
@@ -366,6 +417,37 @@ class Renderer {
     return outModel;
   }
 
+  NORM_MESH LoadNormMesh(const OBJ_VERT* verts, unsigned num_verts,
+                         const unsigned* indicies, unsigned num_index,
+                         const wchar_t* diffuse_name,
+                         const wchar_t* normal_name) {
+    // Get device for loading
+    ID3D11Device* creator;
+    d3d.GetDevice((void**)&creator);
+    // Initialize model
+    NORM_MESH outModel;
+    outModel.world = GW::MATH::GIdentityMatrixF;
+    outModel.index_count = num_index;
+    // Load in texture
+    CreateDDSTextureFromFile(creator, diffuse_name, nullptr,
+                             outModel.diffuse.GetAddressOf());
+    CreateDDSTextureFromFile(creator, normal_name, nullptr,
+                             outModel.normal.GetAddressOf());
+    // Create Vertex Buffer
+    D3D11_SUBRESOURCE_DATA bData = {verts, 0, 0};
+    CD3D11_BUFFER_DESC bDesc(sizeof(OBJ_VERT) * num_verts,
+                             D3D11_BIND_VERTEX_BUFFER);
+    creator->CreateBuffer(&bDesc, &bData, outModel.vertexBuffer.GetAddressOf());
+    // Create Index Buffer
+    D3D11_SUBRESOURCE_DATA iData = {indicies, 0, 0};
+    CD3D11_BUFFER_DESC iDesc(sizeof(unsigned) * num_index,
+                             D3D11_BIND_INDEX_BUFFER);
+    creator->CreateBuffer(&iDesc, &iData, outModel.indexBuffer.GetAddressOf());
+    // Free
+    creator->Release();
+    return outModel;
+  }
+
   void DrawObjMesh(const OBJ_MESH& drawMe, size_t index_count,
                    size_t index_offset) {
     ID3D11DeviceContext* con;
@@ -383,6 +465,31 @@ class Renderer {
     // Set texture
     ID3D11ShaderResourceView* const srvs[] = {drawMe.diffuse.Get()};
     con->PSSetShaderResources(0, 1, srvs);
+    // now we can draw
+    con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    con->DrawIndexed(index_count, index_offset, 0);
+    // Release reference count
+    con->Release();
+  }
+
+  void DrawNormalObjMesh(const NORM_MESH& drawMe, size_t index_count,
+                         size_t index_offset) {
+    ID3D11DeviceContext* con;
+    d3d.GetImmediateContext((void**)&con);
+    // Update world matrix
+    shaderVars.w = drawMe.world;
+    con->UpdateSubresource(constantBuffer.Get(), 0, nullptr,
+                           static_cast<void*>(&shaderVars), sizeof(IntoGpu), 0);
+    // Setup pipeline for this mesh
+    const UINT strides[] = {sizeof(OBJ_VERT)};
+    const UINT offsets[] = {0};
+    ID3D11Buffer* const buffs[] = {drawMe.vertexBuffer.Get()};
+    con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, strides, offsets);
+    con->IASetIndexBuffer(drawMe.indexBuffer.Get(), DXGI_FORMAT_R32_UINT, 0);
+    // Set texture
+    ID3D11ShaderResourceView* const srvs[] = {drawMe.diffuse.Get(),
+                                              drawMe.normal.Get()};
+    con->PSSetShaderResources(0, 2, srvs);
     // now we can draw
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     con->DrawIndexed(index_count, index_offset, 0);
@@ -493,8 +600,9 @@ class Renderer {
 
     // Load the fountain
     fountain =
-        LoadObjMesh(fountain_data, fountain_vertexcount, fountain_indicies,
-                    fountain_indexcount, L"../asset/T_Fountain3_D.dds");
+        LoadNormMesh(fountain_data, fountain_vertexcount, fountain_indicies,
+                     fountain_indexcount, L"../asset/T_Fountain3_D.dds",
+                     L"../asset/T_Fountain3_N.dds");
 
     // Instance some willows
     D3D11_BUFFER_DESC instanceBufferDesc;
@@ -592,7 +700,7 @@ class Renderer {
 
     LoadPixShader(pixelShader);
     LoadPixShader(skyPixelShader);
-
+    LoadPixShader(normalPixelShader);
     LoadPixShader(grassPixelShader);
 
     // Create Geometry Shaders
@@ -680,12 +788,13 @@ class Renderer {
     con->PSSetShaderResources(0, 1, sky_tex);
     DrawObjMesh(inverse_box, inverse_box_indexcount, 0);
 
-    // Meshes
+    // Fountain
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
-    con->PSSetShader(pixelShader.Get(), nullptr, 0);
+    con->PSSetShader(normalPixelShader.Get(), nullptr, 0);
+    // con->PSSetShader(pixelShader.Get(), nullptr, 0);
 
-    DrawObjMesh(fountain, fountain_indexcount, 0);
+    DrawNormalObjMesh(fountain, fountain_indexcount, 0);
 
     // TODO: Abstract instanced mesh function.
     // Set texture
@@ -694,6 +803,7 @@ class Renderer {
 
     // Instanced draw
     con->VSSetShader(instancedVertexShader.Get(), nullptr, 0);
+    con->PSSetShader(pixelShader.Get(), nullptr, 0);
     con->IASetInputLayout(instancedVertexFormat.Get());
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     const UINT strides[2] = {sizeof(OBJ_VERT), sizeof(float) * 3};
