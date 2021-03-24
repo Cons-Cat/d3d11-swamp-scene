@@ -81,12 +81,11 @@ const char* grassVertexShaderSource = R"(
 struct GRASS_VERT
 {
    float4 posW_s : SV_POSITION;
-   float4 dirW_c : TEXCOORD;
 };
 
-GRASS_VERT main(float4 posW_s : POSITION, float4 dirW_c : TEXCOORD)
+GRASS_VERT main(float4 posW_s : POSITION)
 {
-   GRASS_VERT output = { posW_s, dirW_c }; // if this syntax doesn't work just set the members directly
+   GRASS_VERT output = { posW_s }; // if this syntax doesn't work just set the members directly
    return output;
 }
 )";
@@ -277,7 +276,6 @@ cbuffer IntoGpu {
 struct GRASS_VERT
 {
    float4 posW_s : SV_POSITION;
-   float4 dirW_c : TEXCOORD;
 };
 
 [maxvertexcount(3)]
@@ -301,6 +299,7 @@ void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
    simple[2].posH.x += half_bh;
 
    for (uint i = 0; i < 3; ++i) {
+      //simple[i].posH = mul(simple[i].posH, w);
       simple[i].posH = mul(simple[i].posH, v);
       simple[i].posH = mul(simple[i].posH, p);
       output.Append(simple[i]);
@@ -806,8 +805,6 @@ class Renderer {
     D3D11_INPUT_ELEMENT_DESC grass_format[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
-         D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
     creator->CreateInputLayout(grass_format, ARRAYSIZE(grass_format),
@@ -878,7 +875,6 @@ class Renderer {
                               0);
 
     // Grass geometry
-    /*
     const unsigned int grass_offsets[] = {0, 0};
     const unsigned int grass_strides[] = {sizeof(float) * 4, sizeof(float) * 4};
 
@@ -904,7 +900,6 @@ class Renderer {
     con->RSSetState(grass_rs);
 
     con->Draw(grass_count, 0);
-    */
 
     // release temp handles
     view->Release();
