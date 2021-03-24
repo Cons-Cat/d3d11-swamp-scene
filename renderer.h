@@ -65,9 +65,10 @@ OUT_VERT main(float3 inputVertex : POSITION,
 {
    OUT_VERT output;
 	output.pos = float4(inputVertex, 1);
+   output.nrm = output.pos;
    output.pos = mul(mul(mul(output.pos, w),v),p);
    output.uv = texCoord.xy;
-   output.nrm = mul(normal, w);
+   //output.nrm = mul(normal, w);
    return output;
 }
 )";
@@ -229,7 +230,7 @@ float4 main(float2 uv : TEXTURE,
             float4 pos : SV_POSITION
 ) : SV_TARGET
 {
-   float4 color = in_tex.Sample(sam, pos.xyz);
+   float4 color = in_tex.Sample(sam, nrm.xyz);
    return color;
 }
 )";
@@ -831,6 +832,7 @@ class Renderer {
     ID3D11RenderTargetView* const views[] = {view};
     con->OMSetRenderTargets(ARRAYSIZE(views), views, depth);
     con->OMSetBlendState(blendState, 0, 0xFFFFFF);
+    con->GSSetShader(nullptr, 0, 0);
 
     con->IASetInputLayout(vertexFormat.Get());
 
@@ -877,32 +879,32 @@ class Renderer {
 
     // Grass geometry
     /*
-const unsigned int grass_offsets[] = {0, 0};
-const unsigned int grass_strides[] = {sizeof(float) * 4, sizeof(float) * 4};
+    const unsigned int grass_offsets[] = {0, 0};
+    const unsigned int grass_strides[] = {sizeof(float) * 4, sizeof(float) * 4};
 
-ID3D11Buffer* const buffs[] = {grassPositions.Get(), grassDirections.Get()};
+    ID3D11Buffer* const buffs[] = {grassPositions.Get(), grassDirections.Get()};
 
-con->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
-con->IASetInputLayout(grassVertexFormat.Get());
-con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, grass_strides,
-                        grass_offsets);
+    con->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+    con->IASetInputLayout(grassVertexFormat.Get());
+    con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, grass_strides,
+                            grass_offsets);
 
-con->GSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
+    con->GSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
 
-con->VSSetShader(grassVertexShader.Get(), 0, 0);
-con->GSSetShader(grassGeoShader.Get(), 0, 0);
-con->PSSetShader(grassPixelShader.Get(), 0, 0);
+    con->VSSetShader(grassVertexShader.Get(), 0, 0);
+    con->GSSetShader(grassGeoShader.Get(), 0, 0);
+    con->PSSetShader(grassPixelShader.Get(), 0, 0);
 
-ID3D11Device* creator;
-d3d.GetDevice((void**)&creator);
-const D3D11_RASTERIZER_DESC grass_desc =
-    D3D11_RASTERIZER_DESC{D3D11_FILL_SOLID, D3D11_CULL_NONE};
-ID3D11RasterizerState* grass_rs;
-creator->CreateRasterizerState(&grass_desc, &grass_rs);
-con->RSSetState(grass_rs);
+    ID3D11Device* creator;
+    d3d.GetDevice((void**)&creator);
+    const D3D11_RASTERIZER_DESC grass_desc =
+        D3D11_RASTERIZER_DESC{D3D11_FILL_SOLID, D3D11_CULL_NONE};
+    ID3D11RasterizerState* grass_rs;
+    creator->CreateRasterizerState(&grass_desc, &grass_rs);
+    con->RSSetState(grass_rs);
 
-con->Draw(grass_count, 0);
-*/
+    con->Draw(grass_count, 0);
+    */
 
     // release temp handles
     view->Release();
