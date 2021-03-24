@@ -44,6 +44,41 @@ OUT_VERT main(float3 inputVertex : POSITION,
 )";
 #pragma endregion
 
+// Ground Shader
+#pragma region
+const char* groundVertexShaderSource = R"(
+#pragma pack_matrix(row_major)
+cbuffer IntoGpu {
+   matrix w, v, p;
+};
+
+struct OUT_VERT
+{
+   float2 uv : TEXTURE;
+   float3 nrm : NORMAL;
+   float4 pos : SV_POSITION;
+};
+
+OUT_VERT main(float3 inputVertex : POSITION,
+              float3 texCoord : UVW,
+              float3 normal : NORMAL)
+{
+   OUT_VERT output;
+	output.pos = float4(inputVertex, 1);
+   if (output.pos.x * output.pos.x + output.pos.z * output.pos.z > 80) {
+      output.pos.y -= (sin(output.pos.x/2) * sin(output.pos.z/2)) / 1.5 + 0.5;
+      if (output.pos.y > 0) {
+         output.pos *= 10.5f;
+      }
+   }
+   output.pos = mul(mul(mul(output.pos, w),v),p);
+   output.uv = texCoord.xy;
+   output.nrm = mul(normal, w);
+   return output;
+}
+)";
+#pragma endregion
+
 // Skybox Shader
 #pragma region
 const char* skyVertexShaderSource = R"(
@@ -328,6 +363,7 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
+  Microsoft::WRL::ComPtr<ID3D11VertexShader> groundVertexShader;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> instancedVertexFormat;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> instancedVertexShader;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> skyVertexShader;
@@ -717,6 +753,7 @@ class Renderer {
     LoadVertShader(skyVertexShader);
     LoadVertShader(instancedVertexShader);
     LoadVertShader(grassVertexShader);
+    LoadVertShader(groundVertexShader);
 
     // Create Pixel Shaders
 #define LoadPixShader(shdname)                                               \
@@ -813,7 +850,7 @@ class Renderer {
 
     // Ground
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
-    con->VSSetShader(vertexShader.Get(), nullptr, 0);
+    con->VSSetShader(groundVertexShader.Get(), nullptr, 0);
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
     DrawObjMesh(ground, my_ground_indexcount, 0);
 
