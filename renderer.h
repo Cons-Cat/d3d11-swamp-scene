@@ -263,6 +263,7 @@ float4 main(float2 uv : TEXTURE,
 // Grass Shader
 #pragma region
 const char* grassGeoShaderSource = R"(
+#pragma pack_matrix(row_major)
 struct GSOutput
 {
    float4 clr : COLOR;
@@ -299,7 +300,6 @@ void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
    simple[2].posH.x += half_bh;
 
    for (uint i = 0; i < 3; ++i) {
-      // simple[i].posH = mul(simple[i].posH, w);
       simple[i].posH = mul(simple[i].posH, v);
       simple[i].posH = mul(simple[i].posH, p);
       output.Append(simple[i]);
@@ -307,13 +307,6 @@ void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
 }
 )";
 #pragma endregion
-
-/*
-struct GRASS_VERT {
-  float clr[4];
-  float pos[4];
-};
-*/
 
 // --------------------------------
 
