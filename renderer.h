@@ -74,15 +74,17 @@ OUT_VERT main(float3 inputVertex : POSITION,
 // Grass Shader
 #pragma region
 const char* grassVertexShaderSource = R"(
+#pragma pack_matrix(row_major)
 struct GRASS_VERT
 {
    float4 posW_s : SV_POSITION;
    float4 dirW_c : TEXCOORD;
 };
 
-GRASS_VERT main(GRASS_VERT input)
+GRASS_VERT main(float4 posW_s : POSITION, float4 dirW_c : TEXCOORD)
 {
-   return input;
+   GRASS_VERT output = { posW_s, dirW_c }; // if this syntax doesn't work just set the members directly
+   return output;
 }
 )";
 #pragma endregion
@@ -146,7 +148,7 @@ float4 main(float2 uv : TEXTURE,
       float3 lightDir = { -1, -1, 1 };
       lightDir = normalize(lightDir);
       float lightR = dot(-lightDir, normalize(nrm));
-      color = color * (lightR + 1)/2;
+      color = color * (lightR + a)/2;
       color.a = temp_alpha;
       return color;
    }
@@ -164,7 +166,7 @@ float4 main(
             float4 pos : SV_POSITION
 ) : SV_TARGET
 {
-   return 1;
+   return clr;
 }
 )";
 #pragma endregion
@@ -201,6 +203,10 @@ struct GSOutput
    float4 posH : SV_POSITION;
 };
 
+cbuffer IntoGpu {
+   matrix w, v, p;
+};
+
 struct GRASS_VERT
 {
    float4 posW_s : SV_POSITION;
@@ -210,7 +216,6 @@ struct GRASS_VERT
 [maxvertexcount(3)]
 void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
 {
-   // float half_bh = theScene.blade_height * 0.5;
    float blade_height = 6;
    float half_bh = blade_height * 0.5;
    
@@ -229,8 +234,8 @@ void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
    simple[2].posH.x += half_bh;
 
    for (uint i = 0; i < 3; ++i) {
-      //simple[i].posH = mul(simple[i].posH, theScene.ViewProjection);
-      //simple[i].posH = mul(simple[i].posH, 1);
+      simple[i].posH = mul(simple[i].posH, v);
+      simple[i].posH = mul(simple[i].posH, p);
       output.Append(simple[i]);
    }
 }
@@ -306,7 +311,7 @@ class Renderer {
   std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
 
   // Geometry shader
-  const unsigned int grass_count = 10;
+  unsigned int grass_count;
   float blade_height = 10.0f;
 
   struct GRASS_POS {
@@ -503,10 +508,29 @@ class Renderer {
     D3D11_SUBRESOURCE_DATA grassInstanceDataPos;
     D3D11_SUBRESOURCE_DATA grassInstanceDataDir;
 
-    grass_positions.push_back({2, 2, 2});
+    grass_positions.push_back({0, 0, 0});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({2, 0, 0});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({0, 2, 0});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({0, 0, 2});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({2, 2, 0});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({-2, 0, 0});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({0, -2, 0});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({-2, -2, 0});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({-2, -2, -2});
+    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({-2, 0, -2});
     grass_directions.push_back({0, 1, 0});
 
-    instanceBufferDesc.ByteWidth = sizeof(GRASS_POS) * grass_positions.size();
+    grass_count = grass_positions.size();
+    instanceBufferDesc.ByteWidth = sizeof(GRASS_POS) * grass_count;
 
     grassInstanceDataPos.pSysMem = &grass_positions[0];
     creator->CreateBuffer(&instanceBufferDesc, &grassInstanceDataPos,
@@ -526,15 +550,16 @@ class Renderer {
     compilerFlags |= D3DCOMPILE_DEBUG;
 #endif
 
-    Microsoft::WRL::ComPtr<ID3DBlob> vsBlob, psBlob, gsBlob, errors;
+    Microsoft::WRL::ComPtr<ID3DBlob> errors;
 
     // Create Vertex Shaders
 #define LoadVertShader(shdname)                                              \
+  Microsoft::WRL::ComPtr<ID3DBlob>##shdname##Blob;                           \
   D3DCompile(##shdname##Source, strlen(##shdname##Source), nullptr, nullptr, \
              nullptr, "main", "vs_4_0", compilerFlags, 0,                    \
-             vsBlob.GetAddressOf(), errors.GetAddressOf());                  \
-  creator->CreateVertexShader(vsBlob->GetBufferPointer(),                    \
-                              vsBlob->GetBufferSize(), nullptr,              \
+             ##shdname##Blob.GetAddressOf(), errors.GetAddressOf());         \
+  creator->CreateVertexShader(##shdname##Blob->GetBufferPointer(),           \
+                              ##shdname##Blob->GetBufferSize(), nullptr,     \
                               ##shdname##.GetAddressOf());                   \
   errors.Reset();
 
@@ -547,11 +572,12 @@ class Renderer {
 
     // Create Pixel Shaders
 #define LoadPixShader(shdname)                                               \
+  Microsoft::WRL::ComPtr<ID3DBlob>##shdname##Blob;                           \
   D3DCompile(##shdname##Source, strlen(##shdname##Source), nullptr, nullptr, \
              nullptr, "main", "ps_4_0", compilerFlags, 0,                    \
-             psBlob.GetAddressOf(), errors.GetAddressOf());                  \
-  creator->CreatePixelShader(psBlob->GetBufferPointer(),                     \
-                             psBlob->GetBufferSize(), nullptr,               \
+             ##shdname##Blob.GetAddressOf(), errors.GetAddressOf());         \
+  creator->CreatePixelShader(##shdname##Blob->GetBufferPointer(),            \
+                             ##shdname##Blob->GetBufferSize(), nullptr,      \
                              ##shdname##.GetAddressOf());                    \
   errors.Reset();
 
@@ -559,15 +585,17 @@ class Renderer {
     LoadPixShader(pixelShader);
     LoadPixShader(skyPixelShader);
     */
+
     LoadPixShader(grassPixelShader);
 
     // Create Geometry Shaders
 #define LoadGeoShader(shdname)                                               \
+  Microsoft::WRL::ComPtr<ID3DBlob>##shdname##Blob;                           \
   D3DCompile(##shdname##Source, strlen(##shdname##Source), nullptr, nullptr, \
              nullptr, "main", "gs_4_0", compilerFlags, 0,                    \
-             gsBlob.GetAddressOf(), errors.GetAddressOf());                  \
-  creator->CreateGeometryShader(gsBlob->GetBufferPointer(),                  \
-                                gsBlob->GetBufferSize(), nullptr,            \
+             ##shdname##Blob.GetAddressOf(), errors.GetAddressOf());         \
+  creator->CreateGeometryShader(##shdname##Blob->GetBufferPointer(),         \
+                                ##shdname##Blob->GetBufferSize(), nullptr,   \
                                 ##shdname##.GetAddressOf());                 \
   errors.Reset();
 
@@ -590,8 +618,8 @@ class Renderer {
     };
 
     creator->CreateInputLayout(
-        format, ARRAYSIZE(format), vsBlob->GetBufferPointer(),
-        vsBlob->GetBufferSize(), vertexFormat.GetAddressOf());
+        format, ARRAYSIZE(format), vertexShaderBlob->GetBufferPointer(),
+        vertexShaderBlob->GetBufferSize(), vertexFormat.GetAddressOf());
     */
 
     D3D11_INPUT_ELEMENT_DESC grass_format[] = {
@@ -601,12 +629,10 @@ class Renderer {
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
-    if (creator->CreateInputLayout(grass_format, ARRAYSIZE(grass_format),
-                                   vsBlob->GetBufferPointer(),
-                                   vsBlob->GetBufferSize(),
-                                   grassVertexFormat.GetAddressOf()) != S_OK) {
-      int a = 0;
-    }
+    creator->CreateInputLayout(grass_format, ARRAYSIZE(grass_format),
+                               grassVertexShaderBlob->GetBufferPointer(),
+                               grassVertexShaderBlob->GetBufferSize(),
+                               grassVertexFormat.GetAddressOf());
 
     // free temporary handle
     creator->Release();
@@ -637,11 +663,11 @@ class Renderer {
     DrawObjMesh(inverse_box, inverse_box_indexcount, 0);
     */
 
-    /*
     // Meshes
-    con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
-    con->PSSetShader(pixelShader.Get(), nullptr, 0);
+    // con->VSSetShader(vertexShader.Get(), nullptr, 0);
+    // con->PSSetShader(pixelShader.Get(), nullptr, 0);
+    /*
 
     DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
     */
@@ -677,22 +703,23 @@ class Renderer {
     con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, grass_strides,
                             grass_offsets);
 
+    con->GSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
+
     con->VSSetShader(grassVertexShader.Get(), 0, 0);
     con->GSSetShader(grassGeoShader.Get(), 0, 0);
     con->PSSetShader(grassPixelShader.Get(), 0, 0);
 
     ID3D11Device* creator;
     d3d.GetDevice((void**)&creator);
-    const D3D11_RASTERIZER_DESC* grass_desc =
-        new D3D11_RASTERIZER_DESC{D3D11_FILL_SOLID, D3D11_CULL_NONE};
+    const D3D11_RASTERIZER_DESC grass_desc =
+        D3D11_RASTERIZER_DESC{D3D11_FILL_SOLID, D3D11_CULL_NONE};
     ID3D11RasterizerState* grass_rs;
-    creator->CreateRasterizerState(grass_desc, &grass_rs);
+    creator->CreateRasterizerState(&grass_desc, &grass_rs);
     con->RSSetState(grass_rs);
 
-    // con->Draw(grass_count, 0);
-    con->Draw(1, 0);
+    con->Draw(grass_count, 0);
+    // con->Draw(1, 0);
 
-    delete grass_desc;
     // release temp handles
     view->Release();
     depth->Release();
