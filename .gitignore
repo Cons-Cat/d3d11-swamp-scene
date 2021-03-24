@@ -9,6 +9,7 @@ cmake-build-debug/
 *.ma
 *.mtl
 *.tmp
+*.blend
 shader/pixl_simple.h
 shader/vert_simple.h
 
