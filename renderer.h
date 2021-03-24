@@ -83,9 +83,9 @@ struct GRASS_VERT
    float4 posW_s : SV_POSITION;
 };
 
-GRASS_VERT main(float4 posW_s : POSITION)
+GRASS_VERT main(float3 posW_s : POSITION)
 {
-   GRASS_VERT output = { posW_s }; // if this syntax doesn't work just set the members directly
+   GRASS_VERT output = { posW_s, 1 }; // if this syntax doesn't work just set the members directly
    return output;
 }
 )";
@@ -299,7 +299,7 @@ void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
    simple[2].posH.x += half_bh;
 
    for (uint i = 0; i < 3; ++i) {
-      //simple[i].posH = mul(simple[i].posH, w);
+      // simple[i].posH = mul(simple[i].posH, w);
       simple[i].posH = mul(simple[i].posH, v);
       simple[i].posH = mul(simple[i].posH, p);
       output.Append(simple[i]);
@@ -308,10 +308,12 @@ void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
 )";
 #pragma endregion
 
+/*
 struct GRASS_VERT {
   float clr[4];
   float pos[4];
 };
+*/
 
 // --------------------------------
 
@@ -333,7 +335,6 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11PixelShader> grassPixelShader;
   Microsoft::WRL::ComPtr<ID3D11GeometryShader> grassGeoShader;
   Microsoft::WRL::ComPtr<ID3D11Buffer> grassPositions;
-  Microsoft::WRL::ComPtr<ID3D11Buffer> grassDirections;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> grassVertexFormat;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> normalPixelShader;
   ID3D11BlendState* blendState;
@@ -399,18 +400,9 @@ class Renderer {
     float x;
     float y;
     float z;
-    float w = 1;
-  };
-
-  struct GRASS_DIR {
-    float x;
-    float y;
-    float z;
-    float w = 1;
   };
 
   std::vector<GRASS_POS> grass_positions;
-  std::vector<GRASS_DIR> grass_directions;
 
  public:
   OBJ_MESH LoadObjMesh(const OBJ_VERT* verts, unsigned num_verts,
@@ -678,39 +670,23 @@ class Renderer {
 
     // Create grass
     D3D11_SUBRESOURCE_DATA grassInstanceDataPos;
-    D3D11_SUBRESOURCE_DATA grassInstanceDataDir;
 
-    grass_positions.push_back({0, 0, 0});
-    grass_directions.push_back({0, 1, 0});
+    grass_positions.push_back({2, 0, 2});
     grass_positions.push_back({2, 0, 0});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({0, 2, 0});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({0, 0, 2});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({2, 2, 0});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({-2, 0, 0});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({0, -2, 0});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({-2, -2, 0});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({-2, -2, -2});
-    grass_directions.push_back({0, 1, 0});
     grass_positions.push_back({-2, 0, -2});
-    grass_directions.push_back({0, 1, 0});
 
     grass_count = grass_positions.size();
     instanceBufferDesc.ByteWidth = sizeof(GRASS_POS) * grass_count;
-
     grassInstanceDataPos.pSysMem = &grass_positions[0];
     creator->CreateBuffer(&instanceBufferDesc, &grassInstanceDataPos,
                           grassPositions.GetAddressOf());
-
-    grassInstanceDataDir.pSysMem = &grass_directions[0];
-    creator->CreateBuffer(&instanceBufferDesc, &grassInstanceDataDir,
-                          grassDirections.GetAddressOf());
 
     // Create Constant Buffer
     D3D11_SUBRESOURCE_DATA cData = {&shaderVars, 0, 0};
@@ -803,7 +779,7 @@ class Renderer {
 
     // Create Grass Input Layout
     D3D11_INPUT_ELEMENT_DESC grass_format[] = {
-        {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
@@ -875,15 +851,14 @@ class Renderer {
                               0);
 
     // Grass geometry
-    const unsigned int grass_offsets[] = {0, 0};
-    const unsigned int grass_strides[] = {sizeof(float) * 4, sizeof(float) * 4};
-
-    ID3D11Buffer* const buffs[] = {grassPositions.Get(), grassDirections.Get()};
+    const unsigned int grass_offsets[] = {0};
+    const unsigned int grass_strides[] = {sizeof(GRASS_POS)};
+    ID3D11Buffer* const grass_buffs[] = {grassPositions.Get()};
 
     con->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
     con->IASetInputLayout(grassVertexFormat.Get());
-    con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, grass_strides,
-                            grass_offsets);
+    con->IASetVertexBuffers(0, ARRAYSIZE(grass_buffs), grass_buffs,
+                            grass_strides, grass_offsets);
 
     con->GSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
 
@@ -891,6 +866,7 @@ class Renderer {
     con->GSSetShader(grassGeoShader.Get(), 0, 0);
     con->PSSetShader(grassPixelShader.Get(), 0, 0);
 
+    // TODO: Move into constructor.
     ID3D11Device* creator;
     d3d.GetDevice((void**)&creator);
     const D3D11_RASTERIZER_DESC grass_desc =
