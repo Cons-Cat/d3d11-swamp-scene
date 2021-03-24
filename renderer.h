@@ -6,6 +6,7 @@
 #include "DDSTextureLoader.h"
 #include "asset/fountain.h"
 #include "asset/inverse_box.h"
+#include "asset/my_ground.h"
 #include "asset/test_pyramid.h"
 #include "asset/willow.h"
 
@@ -234,6 +235,28 @@ float4 main(float2 uv : TEXTURE,
 )";
 #pragma endregion
 
+// Simple Shader
+#pragma region
+const char* tiledPixelShaderSource = R"(
+Texture2D in_tex;
+SamplerState sam;
+
+float4 main(float2 uv : TEXTURE,
+            float3 nrm : NORMAL
+) : SV_TARGET
+{
+	float4 color = in_tex.Sample(sam, uv % 512);
+	float temp_alpha = color.a;
+	float3 lightDir = { -1, -1, 1 };
+	lightDir = normalize(lightDir);
+	float lightR = dot(-lightDir, normalize(nrm));
+	color = color * (lightR + color.a) / 2;
+	color.a = temp_alpha;
+   return color;
+}
+)";
+#pragma endregion
+
 // --------------------------------
 // Geometry Shaders
 
@@ -363,6 +386,7 @@ class Renderer {
   // Make objects for models here.
   OBJ_MESH cat_pyramid;
   OBJ_MESH inverse_box;
+  OBJ_MESH ground;
   NORM_MESH fountain;
   INSTANCED_MESH willows;
   std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
@@ -589,6 +613,11 @@ class Renderer {
                               test_pyramid_indicies, test_pyramid_indexcount,
                               L"../asset/my_face.dds");
 
+    // Load the ground
+    ground = LoadObjMesh(my_ground_data, my_ground_vertexcount,
+                         my_ground_indicies, my_ground_indexcount,
+                         L"../asset/brownishDirt_seamless.dds");
+
     // Load the willow mesh
     willows.obj_mesh =
         LoadObjMesh(willow_data, willow_vertexcount, willow_indicies,
@@ -613,8 +642,32 @@ class Renderer {
     instanceBufferDesc.CPUAccessFlags = 0;
     instanceBufferDesc.MiscFlags = 0;
     // Make willows data
-    willows_instances.push_back({0, 0, 40});
-    willows_instances.push_back({-5, 0, 10});
+    float world_size = 200;
+    float min_dist = 80;
+    for (size_t i = 0; i < 430; i++) {
+      // Distribute trees far away from {0,0,0}
+      float rng_m =
+          (float(rand()) / float((RAND_MAX)) + (min_dist / world_size)) /
+          (min_dist + world_size) * world_size;
+      float rng_t = float(rand()) / float((RAND_MAX)) * 3.15 * 2;
+
+      float weight_m =
+          (sin(rng_m * (3.14f / 4) * 2) + (min_dist / world_size)) /
+          ((min_dist + world_size) / world_size);
+
+      float m = (rng_m * weight_m * world_size / 2);
+      float x = cos(rng_t) * m;
+      float z = sin(rng_t) * m;
+
+      if (x > -20 && x < 20 && z > -20 && z < 20) {
+        if (rand() % 20 != 0 || m < min_dist * 2) {
+          // Make a path.
+          continue;
+        }
+      }
+
+      willows_instances.push_back({x, 0, z});
+    }
     willows.instance_count = willows_instances.size();
     instanceBufferDesc.ByteWidth =
         sizeof(INSTANCES_POSITION_BUFFER) * willows.instance_count;
@@ -781,6 +834,12 @@ class Renderer {
 
     con->IASetInputLayout(vertexFormat.Get());
 
+    // Ground
+    con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
+    con->VSSetShader(vertexShader.Get(), nullptr, 0);
+    con->PSSetShader(pixelShader.Get(), nullptr, 0);
+    DrawObjMesh(ground, my_ground_indexcount, 0);
+
     // Skybox
     con->VSSetShader(skyVertexShader.Get(), nullptr, 0);
     con->PSSetShader(skyPixelShader.Get(), nullptr, 0);
@@ -792,7 +851,6 @@ class Renderer {
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->PSSetShader(normalPixelShader.Get(), nullptr, 0);
-    // con->PSSetShader(pixelShader.Get(), nullptr, 0);
 
     DrawNormalObjMesh(fountain, fountain_indexcount, 0);
 

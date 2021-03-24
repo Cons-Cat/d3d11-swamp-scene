@@ -33,6 +33,7 @@ add_executable (GreenScreen
 	asset/willow.h
 	asset/inverse_box.h
 	asset/fountain.h
+	asset/my_ground.h
 	DDSTextureLoader.h
 	DDSTextureLoader.cpp
 	${VERTEX_SHADERS}
