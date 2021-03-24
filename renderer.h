@@ -4,6 +4,7 @@
 #include <d3dcompiler.h>
 
 #include "DDSTextureLoader.h"
+#include "asset/fountain.h"
 #include "asset/inverse_box.h"
 #include "asset/test_pyramid.h"
 #include "asset/willow.h"
@@ -311,6 +312,7 @@ class Renderer {
   // Make objects for models here.
   OBJ_MESH cat_pyramid;
   OBJ_MESH inverse_box;
+  OBJ_MESH fountain;
   INSTANCED_MESH willows;
   std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
 
@@ -489,6 +491,11 @@ class Renderer {
     m.ScalingF(willows.obj_mesh.world, GW::MATH::GVECTORF{0.1f, 0.1f, 0.1f},
                willows.obj_mesh.world);
 
+    // Load the fountain
+    fountain =
+        LoadObjMesh(fountain_data, fountain_vertexcount, fountain_indicies,
+                    fountain_indexcount, L"../asset/T_Fountain3_D.dds");
+
     // Instance some willows
     D3D11_BUFFER_DESC instanceBufferDesc;
     D3D11_SUBRESOURCE_DATA instanceData;
@@ -628,11 +635,10 @@ class Renderer {
          D3D11_INPUT_PER_INSTANCE_DATA, 1},
     };
 
-    auto a = creator->CreateInputLayout(
-        instanced_format, ARRAYSIZE(instanced_format),
-        instancedVertexShaderBlob->GetBufferPointer(),
-        instancedVertexShaderBlob->GetBufferSize(),
-        instancedVertexFormat.GetAddressOf());
+    creator->CreateInputLayout(instanced_format, ARRAYSIZE(instanced_format),
+                               instancedVertexShaderBlob->GetBufferPointer(),
+                               instancedVertexShaderBlob->GetBufferSize(),
+                               instancedVertexFormat.GetAddressOf());
 
     // Create Grass Input Layout
     D3D11_INPUT_ELEMENT_DESC grass_format[] = {
@@ -679,7 +685,7 @@ class Renderer {
     con->VSSetShader(vertexShader.Get(), nullptr, 0);
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
 
-    DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
+    DrawObjMesh(fountain, fountain_indexcount, 0);
 
     // TODO: Abstract instanced mesh function.
     // Set texture
