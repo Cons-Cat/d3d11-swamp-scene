@@ -282,27 +282,36 @@ struct GRASS_VERT
 [maxvertexcount(3)]
 void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
 {
-   float blade_height = 6;
-   float half_bh = blade_height * 0.5;
+   // Cull grass
+	float dotv;
+	float3 view_dir = float3(v._41,v._42,v._43);
+	dotv = dot(input[0].posW_s.xyz, view_dir);
+   float range = 10;
+
+	//if (dotv > -range && dotv < range)
+	{
+      float blade_height = 1.5;
+      float half_bh = blade_height * 0.22;
    
-   GSOutput simple[3];
+      GSOutput simple[3];
 
-   simple[0].clr = float4(0.1f, 0.6f, 0.1f, 1);
-   simple[1].clr = float4(0, 1, 0, 1);
-   simple[2].clr = simple[0].clr;
+      simple[0].clr = float4(0.1f, 0.6f, 0.1f, 1);
+      simple[1].clr = float4(0, 1, 0, 1);
+      simple[2].clr = simple[0].clr;
    
-   simple[0].posH = float4(input[0].posW_s.xyz, 1);
-   simple[1].posH = simple[0].posH;
-   simple[2].posH = simple[0].posH;
+      simple[0].posH = float4(input[0].posW_s.xyz, 1);
+      simple[1].posH = simple[0].posH;
+      simple[2].posH = simple[0].posH;
 
-   simple[0].posH.x -= half_bh;
-   simple[1].posH.y += blade_height;
-   simple[2].posH.x += half_bh;
+      simple[0].posH.x -= half_bh;
+      simple[1].posH.y += blade_height;
+      simple[2].posH.x += half_bh;
 
-   for (uint i = 0; i < 3; ++i) {
-      simple[i].posH = mul(simple[i].posH, v);
-      simple[i].posH = mul(simple[i].posH, p);
-      output.Append(simple[i]);
+      for (uint i = 0; i < 3; ++i) {
+         simple[i].posH = mul(simple[i].posH, v);
+         simple[i].posH = mul(simple[i].posH, p);
+         output.Append(simple[i]);
+      }
    }
 }
 )";
@@ -664,16 +673,16 @@ class Renderer {
     // Create grass
     D3D11_SUBRESOURCE_DATA grassInstanceDataPos;
 
-    grass_positions.push_back({2, 0, 2});
-    grass_positions.push_back({2, 0, 0});
-    grass_positions.push_back({0, 2, 0});
-    grass_positions.push_back({0, 0, 2});
-    grass_positions.push_back({2, 2, 0});
-    grass_positions.push_back({-2, 0, 0});
-    grass_positions.push_back({0, -2, 0});
-    grass_positions.push_back({-2, -2, 0});
-    grass_positions.push_back({-2, -2, -2});
-    grass_positions.push_back({-2, 0, -2});
+    for (float i = -200; i < 200; i += 0.5f) {
+      for (float j = -200; j < 200; j += 0.5f) {
+        if (i * i + j * j > 15 * 15) {
+          if (rand() % 3 != 0) {
+            float k = float(rand()) / float(RAND_MAX) - 1;
+            grass_positions.push_back({i, k, j});
+          }
+        }
+      }
+    }
 
     grass_count = grass_positions.size();
     instanceBufferDesc.ByteWidth = sizeof(GRASS_POS) * grass_count;
