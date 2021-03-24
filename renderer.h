@@ -139,19 +139,22 @@ float4 main(float2 uv : TEXTURE,
             float3 nrm : NORMAL
 ) : SV_TARGET
 {
-   float4 color = in_tex.Sample(sam, uv);
-   if (color.a == 0) {
-      discard;
-      return 0;
-   } else {
-      float temp_alpha = color.a;
-      float3 lightDir = { -1, -1, 1 };
-      lightDir = normalize(lightDir);
-      float lightR = dot(-lightDir, normalize(nrm));
-      color = color * (lightR + a)/2;
-      color.a = temp_alpha;
-      return color;
-   }
+	float4 color = in_tex.Sample(sam, uv);
+	if (color.a == 0)
+	{
+		discard;
+		return 0;
+	}
+	else
+	{
+		float temp_alpha = color.a;
+		float3 lightDir = { -1, -1, 1 };
+		lightDir = normalize(lightDir);
+		float lightR = dot(-lightDir, normalize(nrm));
+		color = color * (lightR + color.a) / 2;
+		color.a = temp_alpha;
+		return color;
+	}
 }
 )";
 #pragma endregion
@@ -258,6 +261,7 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11Buffer> constantBuffer;
   Microsoft::WRL::ComPtr<ID3D11InputLayout> vertexFormat;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> vertexShader;
+  Microsoft::WRL::ComPtr<ID3D11InputLayout> instancedVertexFormat;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> instancedVertexShader;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> skyVertexShader;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> grassVertexShader;
@@ -563,11 +567,9 @@ class Renderer {
                               ##shdname##.GetAddressOf());                   \
   errors.Reset();
 
-    /*
     LoadVertShader(vertexShader);
     LoadVertShader(skyVertexShader);
     LoadVertShader(instancedVertexShader);
-    */
     LoadVertShader(grassVertexShader);
 
     // Create Pixel Shaders
@@ -581,10 +583,8 @@ class Renderer {
                              ##shdname##.GetAddressOf());                    \
   errors.Reset();
 
-    /*
     LoadPixShader(pixelShader);
     LoadPixShader(skyPixelShader);
-    */
 
     LoadPixShader(grassPixelShader);
 
@@ -601,10 +601,22 @@ class Renderer {
 
     LoadGeoShader(grassGeoShader);
 
-    // Create Input Layout
-    /*
+    // Create Simple Input Layout
     D3D11_INPUT_ELEMENT_DESC format[] = {
-        // Vertex buffer
+        {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+         D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"UVW", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT,
+         D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
+         D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
+    };
+
+    creator->CreateInputLayout(
+        format, ARRAYSIZE(format), vertexShaderBlob->GetBufferPointer(),
+        vertexShaderBlob->GetBufferSize(), vertexFormat.GetAddressOf());
+
+    // Create Instanced Input Layout
+    D3D11_INPUT_ELEMENT_DESC instanced_format[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
         {"UVW", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT,
@@ -612,16 +624,17 @@ class Renderer {
         {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0,
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
 
-        // Instance buffer
         {"INSTANCEPOS", 0, DXGI_FORMAT_R32G32B32_FLOAT, 1, 0,
          D3D11_INPUT_PER_INSTANCE_DATA, 1},
     };
 
-    creator->CreateInputLayout(
-        format, ARRAYSIZE(format), vertexShaderBlob->GetBufferPointer(),
-        vertexShaderBlob->GetBufferSize(), vertexFormat.GetAddressOf());
-    */
+    auto a = creator->CreateInputLayout(
+        instanced_format, ARRAYSIZE(instanced_format),
+        instancedVertexShaderBlob->GetBufferPointer(),
+        instancedVertexShaderBlob->GetBufferSize(),
+        instancedVertexFormat.GetAddressOf());
 
+    // Create Grass Input Layout
     D3D11_INPUT_ELEMENT_DESC grass_format[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0,
          D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0},
@@ -652,34 +665,30 @@ class Renderer {
     con->OMSetRenderTargets(ARRAYSIZE(views), views, depth);
     con->OMSetBlendState(blendState, 0, 0xFFFFFF);
 
-    /*
     con->IASetInputLayout(vertexFormat.Get());
 
     // Skybox
     con->VSSetShader(skyVertexShader.Get(), nullptr, 0);
     con->PSSetShader(skyPixelShader.Get(), nullptr, 0);
-    //ID3D11ShaderResourceView* const sky_tex[] = {environmentView.Get()};
-    //con->PSSetShaderResources(0, 1, sky_tex);
+    ID3D11ShaderResourceView* const sky_tex[] = {environmentView.Get()};
+    con->PSSetShaderResources(0, 1, sky_tex);
     DrawObjMesh(inverse_box, inverse_box_indexcount, 0);
-    */
 
     // Meshes
     con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
-    // con->VSSetShader(vertexShader.Get(), nullptr, 0);
-    // con->PSSetShader(pixelShader.Get(), nullptr, 0);
-    /*
+    con->VSSetShader(vertexShader.Get(), nullptr, 0);
+    con->PSSetShader(pixelShader.Get(), nullptr, 0);
 
     DrawObjMesh(cat_pyramid, test_pyramid_indexcount, 0);
-    */
 
     // TODO: Abstract instanced mesh function.
-    /*
     // Set texture
     ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
     con->PSSetShaderResources(0, 1, srvs);
 
     // Instanced draw
     con->VSSetShader(instancedVertexShader.Get(), nullptr, 0);
+    con->IASetInputLayout(instancedVertexFormat.Get());
     con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     const UINT strides[2] = {sizeof(OBJ_VERT), sizeof(float) * 3};
     const UINT offsets[2] = {0, 0};
@@ -691,34 +700,35 @@ class Renderer {
     con->IASetVertexBuffers(0, 2, willow_instance_buffers, strides, offsets);
     con->DrawIndexedInstanced(willow_indexcount, willows.instance_count, 0, 0,
                               0);
-                              */
+
     // Grass geometry
-    const unsigned int grass_offsets[] = {0, 0};
-    const unsigned int grass_strides[] = {sizeof(float) * 4, sizeof(float) * 4};
+    /*
+const unsigned int grass_offsets[] = {0, 0};
+const unsigned int grass_strides[] = {sizeof(float) * 4, sizeof(float) * 4};
 
-    ID3D11Buffer* const buffs[] = {grassPositions.Get(), grassDirections.Get()};
+ID3D11Buffer* const buffs[] = {grassPositions.Get(), grassDirections.Get()};
 
-    con->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
-    con->IASetInputLayout(grassVertexFormat.Get());
-    con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, grass_strides,
-                            grass_offsets);
+con->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_POINTLIST);
+con->IASetInputLayout(grassVertexFormat.Get());
+con->IASetVertexBuffers(0, ARRAYSIZE(buffs), buffs, grass_strides,
+                        grass_offsets);
 
-    con->GSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
+con->GSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
 
-    con->VSSetShader(grassVertexShader.Get(), 0, 0);
-    con->GSSetShader(grassGeoShader.Get(), 0, 0);
-    con->PSSetShader(grassPixelShader.Get(), 0, 0);
+con->VSSetShader(grassVertexShader.Get(), 0, 0);
+con->GSSetShader(grassGeoShader.Get(), 0, 0);
+con->PSSetShader(grassPixelShader.Get(), 0, 0);
 
-    ID3D11Device* creator;
-    d3d.GetDevice((void**)&creator);
-    const D3D11_RASTERIZER_DESC grass_desc =
-        D3D11_RASTERIZER_DESC{D3D11_FILL_SOLID, D3D11_CULL_NONE};
-    ID3D11RasterizerState* grass_rs;
-    creator->CreateRasterizerState(&grass_desc, &grass_rs);
-    con->RSSetState(grass_rs);
+ID3D11Device* creator;
+d3d.GetDevice((void**)&creator);
+const D3D11_RASTERIZER_DESC grass_desc =
+    D3D11_RASTERIZER_DESC{D3D11_FILL_SOLID, D3D11_CULL_NONE};
+ID3D11RasterizerState* grass_rs;
+creator->CreateRasterizerState(&grass_desc, &grass_rs);
+con->RSSetState(grass_rs);
 
-    con->Draw(grass_count, 0);
-    // con->Draw(1, 0);
+con->Draw(grass_count, 0);
+*/
 
     // release temp handles
     view->Release();
