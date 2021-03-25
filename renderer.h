@@ -401,6 +401,31 @@ void main (point GRASS_VERT input[1], inout TriangleStream<GSOutput> output)
 
 // --------------------------------
 
+float point_dist(float p1[3], float p2[3]) {
+  float x1 = p1[0];
+  float x2 = p2[0];
+  float y1 = p1[1];
+  float y2 = p2[1];
+  float z1 = p1[2];
+  float z2 = p2[2];
+  return hypot(hypot(x1 - x2, y1 - y2), z1 - z2);
+}
+
+struct INSTANCES_POSITION_BUFFER {
+  float position[3];
+};
+
+struct IntoGpu {
+  GW::MATH::GMATRIXF w, v, p, t;
+};
+IntoGpu shaderVars;
+
+bool willow_compare(INSTANCES_POSITION_BUFFER a, INSTANCES_POSITION_BUFFER b) {
+  float cam[3] = {shaderVars.v.row4.x, shaderVars.v.row4.y,
+                  shaderVars.v.row4.z};
+  return point_dist(cam, a.position) > point_dist(cam, b.position);
+}
+
 // Creation, Rendering & Cleanup
 class Renderer {
   // proxy handles
@@ -460,16 +485,8 @@ class Renderer {
     OBJ_MESH obj_mesh;
   };
 
-  struct INSTANCES_POSITION_BUFFER {
-    float position[3];
-  };
-
   // Math
   GW::MATH::GMatrix m;
-  struct IntoGpu {
-    GW::MATH::GMATRIXF w, v, p, t;
-  };
-  IntoGpu shaderVars;
   int time = 0;
 
   // Make objects for models here.
@@ -657,6 +674,30 @@ class Renderer {
     m.TranslatelocalF(INPUTTER::camera, GW::MATH::GVECTORF{x, 0, z},
                       INPUTTER::camera);
     m.InverseF(INPUTTER::camera, shaderVars.v);
+
+    // Update Willow Buffer
+    /*
+    D3D11_BUFFER_DESC instanceBufferDesc;
+    D3D11_SUBRESOURCE_DATA instanceData;
+    std::vector<INSTANCES_POSITION_BUFFER> willows_instances_resorted =
+        willows_instances.data();
+    ID3D11Device* creator;
+    d3d.GetDevice((void**)&creator);
+
+    instanceBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    instanceBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+    instanceBufferDesc.CPUAccessFlags = 0;
+    instanceBufferDesc.MiscFlags = 0;
+    willows.instance_count = willows_instances.size();
+    instanceBufferDesc.ByteWidth =
+        sizeof(INSTANCES_POSITION_BUFFER) * willows.instance_count;
+    instanceData.pSysMem = &willows_instances_resorted[0];
+
+    // Make instance buffer
+    creator->CreateBuffer(&instanceBufferDesc, &instanceData,
+                          &willows.instanceBuffer);
+                          */
+    sort(willows_instances.begin(), willows_instances.end(), willow_compare);
   }
 
   Renderer(GW::SYSTEM::GWindow _win, GW::GRAPHICS::GDirectX11Surface _d3d) {
@@ -948,27 +989,6 @@ class Renderer {
 
     DrawNormalObjMesh(fountain, fountain_indexcount, 0);
 
-    // TODO: Abstract instanced mesh function.
-    // Set texture
-    ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
-    con->PSSetShaderResources(0, 1, srvs);
-
-    // Instanced draw
-    con->VSSetShader(instancedVertexShader.Get(), nullptr, 0);
-    con->PSSetShader(pixelShader.Get(), nullptr, 0);
-    con->IASetInputLayout(instancedVertexFormat.Get());
-    con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    const UINT strides[2] = {sizeof(OBJ_VERT), sizeof(float) * 3};
-    const UINT offsets[2] = {0, 0};
-
-    ID3D11Buffer* willow_instance_buffers[2] = {
-        willows.obj_mesh.vertexBuffer.Get(), willows.instanceBuffer.Get()};
-    con->IASetIndexBuffer(willows.obj_mesh.indexBuffer.Get(),
-                          DXGI_FORMAT_R32_UINT, 0);
-    con->IASetVertexBuffers(0, 2, willow_instance_buffers, strides, offsets);
-    con->DrawIndexedInstanced(willow_indexcount, willows.instance_count, 0, 0,
-                              0);
-
     // Grass geometry
     const unsigned int grass_offsets[] = {0};
     const unsigned int grass_strides[] = {sizeof(GRASS_POS)};
@@ -995,6 +1015,28 @@ class Renderer {
     con->RSSetState(grass_rs);
 
     con->Draw(grass_count, 0);
+
+    // TODO: Abstract instanced mesh function.
+    // Set texture
+    ID3D11ShaderResourceView* const srvs[] = {willows.obj_mesh.diffuse.Get()};
+    con->PSSetShaderResources(0, 1, srvs);
+
+    // Instanced draw
+    con->GSSetShader(nullptr, 0, 0);
+    con->VSSetShader(instancedVertexShader.Get(), nullptr, 0);
+    con->PSSetShader(pixelShader.Get(), nullptr, 0);
+    con->IASetInputLayout(instancedVertexFormat.Get());
+    con->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    const UINT strides[2] = {sizeof(OBJ_VERT), sizeof(float) * 3};
+    const UINT offsets[2] = {0, 0};
+
+    ID3D11Buffer* willow_instance_buffers[2] = {
+        willows.obj_mesh.vertexBuffer.Get(), willows.instanceBuffer.Get()};
+    con->IASetIndexBuffer(willows.obj_mesh.indexBuffer.Get(),
+                          DXGI_FORMAT_R32_UINT, 0);
+    con->IASetVertexBuffers(0, 2, willow_instance_buffers, strides, offsets);
+    con->DrawIndexedInstanced(willow_indexcount, willows.instance_count, 0, 0,
+                              0);
 
     // release temp handles
     view->Release();
