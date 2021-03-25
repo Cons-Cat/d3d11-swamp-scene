@@ -20,7 +20,7 @@
 const char* vertexShaderSource = R"(
 #pragma pack_matrix(row_major)
 cbuffer IntoGpu {
-   matrix w, v, p;
+   matrix w, v, p, t;
 };
 
 struct OUT_VERT
@@ -49,7 +49,7 @@ OUT_VERT main(float3 inputVertex : POSITION,
 const char* groundVertexShaderSource = R"(
 #pragma pack_matrix(row_major)
 cbuffer IntoGpu {
-   matrix w, v, p;
+   matrix w, v, p, t;
 };
 
 struct OUT_VERT
@@ -79,12 +79,42 @@ OUT_VERT main(float3 inputVertex : POSITION,
 )";
 #pragma endregion
 
+// Water Shader
+#pragma region
+const char* waterVertexShaderSource = R"(
+#pragma pack_matrix(row_major)
+cbuffer IntoGpu {
+   matrix w, v, p, t;
+};
+
+struct OUT_VERT
+{
+   float2 uv : TEXTURE;
+   float3 nrm : NORMAL;
+   float4 pos : SV_POSITION;
+};
+
+OUT_VERT main(float3 inputVertex : POSITION,
+              float3 texCoord : UVW,
+              float3 normal : NORMAL)
+{
+   OUT_VERT output;
+	output.pos = float4(inputVertex, 1);
+   output.pos.y = sin(t[0][0]) / 2.5f * sin(output.pos.x) * sin(output.pos.z) - 0.25f;
+   output.pos = mul(mul(mul(output.pos, w),v),p);
+   output.uv = texCoord.xy;
+   output.nrm = mul(normal, w);
+   return output;
+}
+)";
+#pragma endregion
+
 // Skybox Shader
 #pragma region
 const char* skyVertexShaderSource = R"(
 #pragma pack_matrix(row_major)
 cbuffer IntoGpu {
-   matrix w, v, p;
+   matrix w, v, p, t;
 };
 
 struct OUT_VERT
@@ -131,7 +161,7 @@ GRASS_VERT main(float3 posW_s : POSITION)
 const char* instancedVertexShaderSource = R"(
 #pragma pack_matrix(row_major)
 cbuffer IntoGpu {
-   matrix w, v, p;
+   matrix w, v, p, t;
 };
 
 struct OUT_VERT
@@ -270,7 +300,7 @@ float4 main(float2 uv : TEXTURE,
 )";
 #pragma endregion
 
-// Simple Shader
+// Ground Shader
 #pragma region
 const char* tiledPixelShaderSource = R"(
 Texture2D in_tex;
@@ -292,6 +322,23 @@ float4 main(float2 uv : TEXTURE,
 )";
 #pragma endregion
 
+// Water Shader
+#pragma region
+const char* waterPixelShaderSource = R"(
+float4 main(float2 uv : TEXTURE,
+            float3 nrm : NORMAL
+) : SV_TARGET
+{
+   float4 color = {0,0,1,1};
+	float3 lightDir = { -1, -1, 1 };
+	lightDir = normalize(lightDir);
+	float lightR = dot(-lightDir, normalize(nrm));
+	color = color * (lightR *2);
+	return color;
+}
+)";
+#pragma endregion
+
 // --------------------------------
 // Geometry Shaders
 
@@ -306,7 +353,7 @@ struct GSOutput
 };
 
 cbuffer IntoGpu {
-   matrix w, v, p;
+   matrix w, v, p, t;
 };
 
 struct GRASS_VERT
@@ -367,9 +414,11 @@ class Renderer {
   Microsoft::WRL::ComPtr<ID3D11InputLayout> instancedVertexFormat;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> instancedVertexShader;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> skyVertexShader;
+  Microsoft::WRL::ComPtr<ID3D11VertexShader> waterVertexShader;
   Microsoft::WRL::ComPtr<ID3D11VertexShader> grassVertexShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> pixelShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> skyPixelShader;
+  Microsoft::WRL::ComPtr<ID3D11PixelShader> waterPixelShader;
   Microsoft::WRL::ComPtr<ID3D11PixelShader> grassPixelShader;
   Microsoft::WRL::ComPtr<ID3D11GeometryShader> grassGeoShader;
   Microsoft::WRL::ComPtr<ID3D11Buffer> grassPositions;
@@ -418,14 +467,16 @@ class Renderer {
   // Math
   GW::MATH::GMatrix m;
   struct IntoGpu {
-    GW::MATH::GMATRIXF w, v, p;
+    GW::MATH::GMATRIXF w, v, p, t;
   };
   IntoGpu shaderVars;
+  int time = 0;
 
   // Make objects for models here.
   OBJ_MESH cat_pyramid;
   OBJ_MESH inverse_box;
   OBJ_MESH ground;
+  OBJ_MESH water;
   NORM_MESH fountain;
   INSTANCED_MESH willows;
   std::vector<INSTANCES_POSITION_BUFFER> willows_instances;
@@ -558,6 +609,24 @@ class Renderer {
   void Update() {
     // Update a mesh
     // m.RotationYF(cat_pyramid.world, 0.01f, cat_pyramid.world);
+    time = (time + 1) % INT_MAX;
+    float t = float(time) / 50;
+    shaderVars.t.row1.x = t;
+    shaderVars.t.row2.x = t;
+    shaderVars.t.row3.x = t;
+    shaderVars.t.row4.x = t;
+    shaderVars.t.row1.y = t;
+    shaderVars.t.row2.y = t;
+    shaderVars.t.row3.y = t;
+    shaderVars.t.row4.y = t;
+    shaderVars.t.row1.z = t;
+    shaderVars.t.row2.z = t;
+    shaderVars.t.row3.z = t;
+    shaderVars.t.row4.z = t;
+    shaderVars.t.row1.w = t;
+    shaderVars.t.row2.w = t;
+    shaderVars.t.row3.w = t;
+    shaderVars.t.row4.w = t;
 
     // Look camera
     m.InverseF(shaderVars.v, shaderVars.v);
@@ -647,6 +716,9 @@ class Renderer {
     ground = LoadObjMesh(my_ground_data, my_ground_vertexcount,
                          my_ground_indicies, my_ground_indexcount,
                          L"../asset/brownishDirt_seamless.dds");
+    water = LoadObjMesh(my_ground_data, my_ground_vertexcount,
+                        my_ground_indicies, my_ground_indexcount,
+                        L"../asset/brownishDirt_seamless.dds");
 
     // Load the willow mesh
     willows.obj_mesh =
@@ -754,6 +826,7 @@ class Renderer {
     LoadVertShader(instancedVertexShader);
     LoadVertShader(grassVertexShader);
     LoadVertShader(groundVertexShader);
+    LoadVertShader(waterVertexShader);
 
     // Create Pixel Shaders
 #define LoadPixShader(shdname)                                               \
@@ -770,6 +843,7 @@ class Renderer {
     LoadPixShader(skyPixelShader);
     LoadPixShader(normalPixelShader);
     LoadPixShader(grassPixelShader);
+    LoadPixShader(waterPixelShader);
 
     // Create Geometry Shaders
 #define LoadGeoShader(shdname)                                               \
@@ -853,6 +927,12 @@ class Renderer {
     con->VSSetShader(groundVertexShader.Get(), nullptr, 0);
     con->PSSetShader(pixelShader.Get(), nullptr, 0);
     DrawObjMesh(ground, my_ground_indexcount, 0);
+
+    // Water
+    con->VSSetConstantBuffers(0, 1, constantBuffer.GetAddressOf());
+    con->VSSetShader(waterVertexShader.Get(), nullptr, 0);
+    con->PSSetShader(waterPixelShader.Get(), nullptr, 0);
+    DrawObjMesh(water, my_ground_indexcount, 0);
 
     // Skybox
     con->VSSetShader(skyVertexShader.Get(), nullptr, 0);
