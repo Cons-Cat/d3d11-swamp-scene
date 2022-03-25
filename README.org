@@ -1,5 +1,5 @@
 * Project Portfolio 4
 
-I made this 3D scene with DirectX 11.
+I made this 3D scene with DirectX 11. This involves vertex/fragment/geometry shaders, clock-based animation, semi-transparency, a skybox, programmatic terrain deformation, directional lighting, and normal maps.
 
 [[./image.png]]
